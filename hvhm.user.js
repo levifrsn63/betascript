@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name             hvhm – Krunker Cheat
 // @namespace        https://github.com/hvhm/hvhm
-// @version          1.10.35
+// @version          1.10.36
 // @description      Krunker aimbot, ESP, skins, bhop and mod menu.
 // @author           hvhm
 // @match            *://krunker.io/*
@@ -133,8 +133,7 @@
 
             this.defaultSettings = {
                 aimbotEnabled: true,
-                aimbotOnAimKey: false,
-                aimbotFovCheck: true,
+                aimbotOnRightMouse: false,
                 aimbotWallCheck: true,
                 aimbotWallBangs: false,
                 aimbotTeamCheck: true,
@@ -241,7 +240,6 @@
             this.defaultHotkeys = {
                 toggleMenu: 'Insert',
                 aimbotEnabled: 'F2',
-                aimKey: 'Mouse2',
                 bhopEnabled: 'F4',
                 autoFireEnabled: 'F5',
                 superSilentEnabled: 'F6',
@@ -280,7 +278,7 @@
                     try { this.notify({ title: 'Welcome', message: 'hvhm cheat loaded — press Insert for menu', timeout: 5000 }); } catch (e) {}
                 }
 
-            console.log("hvhm: Successfully Initialized! build 1.10.35-qaim-10.0.0");
+            console.log("hvhm: Successfully Initialized! build 1.10.36-qtab-10.0.0");
             } catch (error) {
                 console.error('hvhm: FATAL ERROR during initialization.', error);
             }
@@ -295,9 +293,6 @@
                 console.warn("hvhm: Could not parse settings, using defaults.");
             }
             this.settings = { ...this.defaultSettings, ...loadedSettings };
-            if (loadedSettings && !Object.prototype.hasOwnProperty.call(loadedSettings, 'aimbotOnAimKey') && Object.prototype.hasOwnProperty.call(loadedSettings, 'aimbotOnRightMouse')) {
-                this.settings.aimbotOnAimKey = Boolean(loadedSettings.aimbotOnRightMouse);
-            }
             if (!loadedSettings || !loadedSettings.espBoxMode) {
                 this.settings.espBoxMode = loadedSettings && loadedSettings.esp3DBoxes ? '3d' : (loadedSettings && loadedSettings.espSquare ? '2d' : 'off');
             }
@@ -868,7 +863,7 @@
             const original_strokeStyle = this.ctx.strokeStyle; const original_lineWidth = this.ctx.lineWidth;
             const original_font = this.ctx.font; const original_fillStyle = this.ctx.fillStyle;
             CRC2d.save.apply(this.ctx, []);
-            if (this.settings.fovSize > 0 && this.settings.drawFovCircle && this.settings.aimbotFovCheck) {
+            if (this.settings.fovSize > 0 && this.settings.drawFovCircle) {
                 const centerX = this.overlay.canvas.width / 2; const centerY = this.overlay.canvas.height / 2;
                 this.ctx.beginPath(); this.ctx.arc(centerX, centerY, this.settings.fovSize, 0, 2 * Math.PI, false);
                 this.ctx.lineWidth = 2; this.ctx.strokeStyle = 'rgba(255,255,255,0.7)';
@@ -1592,14 +1587,18 @@
             }
 
             let target = null;
-            const aimKeyHeld = Boolean(this.hotkeys.aimKey && this.pressedKeys.has(this.hotkeys.aimKey));
-            if (this.settings.aimbotEnabled && (!this.settings.aimbotOnAimKey || aimKeyHeld)) {
+            if (this.settings.aimbotEnabled && (!this.settings.aimbotOnRightMouse || this.rightMouseDown)) {
                 let potentialTargets = [];
-
                 for (let i = 0; i < this.game.players.list.length; i++) {
                     const p = this.game.players.list[i];
+                    const isTeammate = this.isTeam(p);
+                    const teamingFriendly = this.isTeamingFriendly();
+                    const lobbyEntry = p.name ? this.lobbyCheatUsers.get(p.name) : null;
+                    const isOwner = lobbyEntry?.role === 'owner';
+                    const isMod = lobbyEntry?.role === 'moderator';
+                    const skipCheater = isOwner || isMod || teamingFriendly && p.name && lobbyEntry?.teamMode === true;
                     if (this.isDefined(p) && !p.isYou && p.active && p.health > 0 &&
-                        (!this.settings.aimbotTeamCheck || !this.isTeam(p)) &&
+                        (!this.settings.aimbotTeamCheck || !isTeammate) && !skipCheater &&
                         (!this.settings.aimbotWallCheck || this.getCanSee(p))) {
                         p.isBot = false;
                         potentialTargets.push(p);
@@ -1619,27 +1618,19 @@
 
                 potentialTargets.sort((a, b) => this.getDistanceSq(this.me, a) - this.getDistanceSq(this.me, b));
 
-                if (this.settings.aimbotFovCheck && this.settings.fovSize > 0) {
+                if (this.settings.fovSize > 0) {
                     const fovRadiusSq = this.settings.fovSize * this.settings.fovSize;
                     const centerX = this.overlay.canvas.width / 2;
                     const centerY = this.overlay.canvas.height / 2;
-
                     potentialTargets = potentialTargets.filter(p => {
-                        const screenPos = this.world2Screen(this.getAimPoint(p));
+                        const screenPos = this.world2Screen({ x: p.x, y: p.y, z: p.z });
                         if (!screenPos) return false;
-                        const distSq = (screenPos.x - centerX)**2 + (screenPos.y - centerY)**2;
+                        const distSq = (screenPos.x - centerX) ** 2 + (screenPos.y - centerY) ** 2;
                         return distSq <= fovRadiusSq;
                     });
                 }
 
-                let bestTarget = potentialTargets[0] || null;
-                const prevTarget = this.aimbotTarget;
-                if (prevTarget && potentialTargets.includes(prevTarget) && bestTarget &&
-                    this.getDistanceSq(this.me, prevTarget) <= this.getDistanceSq(this.me, bestTarget) * 1.25) {
-                    bestTarget = prevTarget;
-                }
-                this.aimbotTarget = bestTarget;
-                target = bestTarget;
+                target = potentialTargets[0] || null;
             }
 
             // Standalone legit triggerbot: checks the crosshair without moving
@@ -1748,7 +1739,6 @@
                 }
             } else if (!target && this.game.gameState !== 4 && this.game.gameState !== 5) {
             this.legitTarget = null;
-            this.aimbotTarget = null;
                 if (!this.settings.superSilentEnabled && !this.settings.antiAimEnabled && !this.settings.antiAimSpinEnabled) {
                     this.resetLookAt();
                 }
@@ -2633,7 +2623,7 @@
             };
 
             const tips = {
-                aimbotEnabled:'Master aimbot toggle.', aimbotOnAimKey:'Only activate while the assigned aim key is held.', aimKey:'Key held to activate the aimbot when Aimkey Only is enabled.', aimbotFovCheck:'When off, aimbot ignores FOV and targets everyone.',
+                aimbotEnabled:'Master aimbot toggle.', aimbotOnRightMouse:'Only aim while right mouse is held.',
                 aimbotWallCheck:'No target through walls.', aimbotWallBangs:'Shoot through penetrable walls.',
                 aimbotTeamCheck:'No target teammates.', aimbotBotCheck:'Target AI/bots.',
                 autoFireEnabled:'Auto fires for the aimbot target.', triggerbotEnabled:'Legit triggerbot: fires when an enemy crosses your crosshair, even with aimbot disabled.', superSilentEnabled:'Aims without moving camera.',
@@ -2701,31 +2691,27 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
                 <button type="button" class="hvhm-preset-btn" data-preset="legitai">Legit+AI</button>
                 <button type="button" class="hvhm-preset-btn" data-preset="off">Off</button>
             </div>
-            <div class="hvhm-section">Activation</div>
-            ${this.createMenuItemHTML('toggle','aimbotEnabled','Aimbot', I.aimbot, tips.aimbotEnabled)}
-            ${this.createMenuItemHTML('toggle','aimbotOnAimKey','Aimkey Only', I.rightMouse, tips.aimbotOnAimKey)}
-            ${this.createHotkeyMenuItemHTML('aimKey','Aim Key', I.rightMouse, tips.aimKey)}
-            <div class="hvhm-section">Target Selection</div>
-            ${this.createMenuItemHTML('toggle','aimbotFovCheck','FOV Check (off = all)', I.fov, tips.aimbotFovCheck)}
-            ${this.createSelectMenuItemHTML('aimTarget','Aim Spot', I.aimbot, 'Choose where the aimbot targets on the enemy.', [['head','Head'],['torso','Torso'],['legs','Legs'],['random','Random']])}
-            ${this.createMenuItemHTML('slider','fovSize','FOV Size', I.fov, tips.fovSize, 0, 1000, 1)}
-            ${this.createMenuItemHTML('toggle','drawFovCircle','FOV Circle', I.fov, tips.drawFovCircle)}
-            ${this.createMenuItemHTML('toggle','aimbotTeamCheck','Team Check', I.teamCheck, tips.aimbotTeamCheck)}
-            ${this.createMenuItemHTML('toggle','aimbotBotCheck','Bot Check', I.robot, tips.aimbotBotCheck)}
-            ${this.createMenuItemHTML('toggle','aimbotWallCheck','Wall Check', I.wall, tips.aimbotWallCheck)}
-            ${this.createMenuItemHTML('toggle','aimbotWallBangs','Wall Bangs', I.wallOff, tips.aimbotWallBangs)}
-            <div class="hvhm-section">Fire Control</div>
+            <div class="hvhm-section">General</div>
+            ${this.createMenuItemHTML('toggle','aimbotEnabled','Aimbot Enabled', I.aimbot, tips.aimbotEnabled)}
+            ${this.createMenuItemHTML('toggle','aimbotOnRightMouse','Right Mouse Trigger', I.rightMouse, tips.aimbotOnRightMouse)}
             ${this.createMenuItemHTML('toggle','autoFireEnabled','Auto Fire', I.autoFire, tips.autoFireEnabled)}
-            ${this.createMenuItemHTML('toggle','triggerbotEnabled','Triggerbot', I.autoFire, tips.triggerbotEnabled)}
-            <div class="hvhm-section">Aim Behavior</div>
-            ${this.createMenuItemHTML('toggle','legitAimbot','Legit Smoothing', I.aimbot, tips.legitAimbot)}
+            ${this.createMenuItemHTML('toggle','superSilentEnabled','Super Silent Aim', I.superSilent, tips.superSilentEnabled)}
+            <div class="hvhm-section">Checks</div>
+            ${this.createMenuItemHTML('toggle','aimbotWallCheck','Wall Check', I.wall, tips.aimbotWallCheck)}
+            ${this.createMenuItemHTML('toggle','aimbotWallBangs','WallBangs', I.wallOff, tips.aimbotWallBangs)}
+            ${this.createMenuItemHTML('toggle','aimbotTeamCheck','Team Check', I.teamCheck, tips.aimbotTeamCheck)}
+            ${this.createMenuItemHTML('toggle','aimbotBotCheck','Bot Aim', I.robot, tips.aimbotBotCheck)}
+            <div class="hvhm-section">Legit Aim</div>
+            ${this.createMenuItemHTML('toggle','legitAimbot','Legit Aim', I.teamCheck, 'Simulates human-like aiming.')}
             ${this.createMenuItemHTML('toggle','legitAiAim','Legit AI Aim', I.robot, 'Apply legit smoothing to bots.')}
-            ${this.createMenuItemHTML('toggle','superSilentEnabled','Silent Aim', I.superSilent, tips.superSilentEnabled)}
-            ${this.createMenuItemHTML('slider','flickSpeed','Flick Speed', I.aimbot, tips.flickSpeed, 0, 100, 1)}
-            ${this.createMenuItemHTML('slider','aimRandomness','Aim Randomness', I.aimbot, tips.aimRandomness, 0, 100, 1)}
-            ${this.createMenuItemHTML('slider','aimTremor','Aim Tremor', I.aimbot, tips.aimTremor, 0, 100, 1)}
-            ${this.createMenuItemHTML('slider','adsTremorReduction','ADS Reduction', I.aimbot, tips.adsTremorReduction, 0, 100, 1)}
-            ${this.createMenuItemHTML('slider','aimOffset','Aim Offset', I.aimbot, tips.aimOffset, -100, 100, 1)}
+            ${this.createMenuItemHTML('slider','flickSpeed','Flick Speed', I.autoFire, 'Flick speed control.', 0, 100, 1)}
+            ${this.createMenuItemHTML('slider','adsTremorReduction','ADS Stability %', I.aimbot, 'Reduces tremor when ADS.', 0, 100, 1)}
+            ${this.createMenuItemHTML('slider','aimRandomness','Aim Wandering', I.line, 'Simulates imperfect aim.', 0, 20, 0.1)}
+            ${this.createMenuItemHTML('slider','aimTremor','Aim Tremor', I.wireframe, 'Hand tremor simulation.', 0, 20, 0.1)}
+            <div class="hvhm-section">Targeting</div>
+            ${this.createSelectMenuItemHTML('aimTarget','Aim Spot', I.aimbot, 'Choose where the aimbot targets on the enemy.', [['head','Head'],['torso','Torso'],['legs','Legs'],['random','Random']])}
+            ${this.createMenuItemHTML('slider','fovSize','FOV Size', I.fov, tips.fovSize, 0, 300, 1)}
+            ${this.createMenuItemHTML('toggle','drawFovCircle','Draw FOV Circle', I.espSquare, tips.drawFovCircle)}
         </div>
         <div class="hvhm-tab-pane" id="hvhm-tab-esp">
             <div class="hvhm-section">Camera</div>
@@ -3360,7 +3346,7 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
 
                 const action = Object.keys(this.hotkeys).find(key => this.hotkeys[key] === e.code);
                 if (action) {
-                    const holdAction = action === 'aimKey' || action === 'aeroSpinOverride';
+                    const holdAction = action === 'aeroSpinOverride';
                     if (!holdAction) { e.preventDefault(); e.stopPropagation(); }
                     if (action === 'toggleMenu') { this.showGUI(); }
                     else if (action === 'panicKey') { e.preventDefault(); e.stopPropagation(); this.panic(); }
