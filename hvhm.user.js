@@ -4,7 +4,7 @@
 // @name:ja          hvhm – Krunker.IO チート
 // @name:az          hvhm – Krunker.IO Hilesi
 // @namespace        https://github.com/hvhm/hvhm
-// @version          1.10.30
+// @version          1.10.31
 // @description      Krunker.io Cheat 2026: Anime Aimbot, ESP/Wallhack, Free Skins, Bhop Script. Working & updated mod menu.
 // @description:tr   Krunker.io Hile 2026: Anime Aimbot, ESP/Wallhack, Bedava Skinler, Bhop Script. Çalışan güncel mod menü.
 // @description:ja   Krunker.io チート 2026: アニメエイムボット、ESP/ウォールハック、無料スキン、Bhopスクリプト。動作中の最新MODメニュー。
@@ -286,7 +286,7 @@
                     try { this.notify({ title: 'Welcome', message: 'hvhm cheat loaded — press Insert for menu', timeout: 5000 }); } catch (e) {}
                 }
 
-            console.log("hvhm: Successfully Initialized! build 1.10.30-readable-10.0.0");
+            console.log("hvhm: Successfully Initialized! build 1.10.31-batchchams-10.0.0");
             } catch (error) {
                 console.error('hvhm: FATAL ERROR during initialization.', error);
             }
@@ -1244,11 +1244,40 @@
             if (enabled) {
                 if (!this._chamsLODState) this._chamsLODState = { useLOD: game.useLOD };
                 game.useLOD = false;
+                // 10.0.0 batches player parts into BatchedMeshes, which ignore
+                // per-mesh material swaps. Stub the batches so players build with
+                // individual meshes that chams can recolor (takes effect as players
+                // respawn). Every batch call site is truthiness-guarded except the
+                // per-frame cosmeticBatch.update(), which the stub provides.
+                const renderer = this.renderer;
+                if (renderer && renderer.playerBatch && !renderer.__hvhmBatchStub) {
+                    renderer.__hvhmBatchStub = {
+                        playerBatch: renderer.playerBatch,
+                        cosmeticBatch: renderer.cosmeticBatch
+                    };
+                    renderer.playerBatch = {
+                        setPart: (player, part, mesh) => mesh,
+                        release: () => {},
+                        update: () => {}
+                    };
+                    renderer.cosmeticBatch = {
+                        add: () => {},
+                        release: () => {},
+                        update: () => {}
+                    };
+                }
                 return;
             }
             if (this._chamsLODState) {
                 game.useLOD = this._chamsLODState.useLOD;
                 this._chamsLODState = null;
+            }
+            const renderer = this.renderer;
+            const stub = renderer && renderer.__hvhmBatchStub;
+            if (stub) {
+                renderer.playerBatch = stub.playerBatch;
+                renderer.cosmeticBatch = stub.cosmeticBatch;
+                delete renderer.__hvhmBatchStub;
             }
         }
 
