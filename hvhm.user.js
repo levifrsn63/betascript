@@ -4,7 +4,7 @@
 // @name:ja          hvhm – Krunker.IO チート
 // @name:az          hvhm – Krunker.IO Hilesi
 // @namespace        https://github.com/hvhm/hvhm
-// @version          1.10.32
+// @version          1.10.33
 // @description      Krunker.io Cheat 2026: Anime Aimbot, ESP/Wallhack, Free Skins, Bhop Script. Working & updated mod menu.
 // @description:tr   Krunker.io Hile 2026: Anime Aimbot, ESP/Wallhack, Bedava Skinler, Bhop Script. Çalışan güncel mod menü.
 // @description:ja   Krunker.io チート 2026: アニメエイムボット、ESP/ウォールハック、無料スキン、Bhopスクリプト。動作中の最新MODメニュー。
@@ -286,7 +286,7 @@
                     try { this.notify({ title: 'Welcome', message: 'hvhm cheat loaded — press Insert for menu', timeout: 5000 }); } catch (e) {}
                 }
 
-            console.log("hvhm: Successfully Initialized! build 1.10.32-batchchams-10.0.0");
+            console.log("hvhm: Successfully Initialized! build 1.10.33-skinscope-settlefire-10.0.0");
             } catch (error) {
                 console.error('hvhm: FATAL ERROR during initialization.', error);
             }
@@ -1709,9 +1709,11 @@
 
                         if (!this.settings.superSilentEnabled) this.lookDir(newX, newY);
                         inputPacket[gameInputIndices.xdir] = newX * 1000; inputPacket[gameInputIndices.ydir] = newY * 1000;
+                        this._aimError = Math.abs(shortestAngleY) + Math.abs(shortestAngleX);
                     } else {
                         if (!this.settings.superSilentEnabled) this.lookDir(xDire, yDire);
                         inputPacket[gameInputIndices.xdir] = xDire * 1000; inputPacket[gameInputIndices.ydir] = yDire * 1000;
+                        this._aimError = 0;
                     }
 
                     if (this.settings.autoFireEnabled) {
@@ -1720,7 +1722,11 @@
                         const inCast = this.rayC.intersectObjects(this.playerMaps, true).length;
                         const canSee = target.objInstances && this.containsPoint(target.objInstances.position);
                         const confirmed = !this.settings.legitAimbot || (inCast && canSee);
-                        if (this.me.reloadTimer === 0 && !this.me.didShoot && confirmed) {
+                        // Don't waste the first shot while legit smoothing is still
+                        // traveling: fire only once the camera has converged onto the
+                        // target. Snap aim and silent aim converge instantly.
+                        const aimSettled = this.settings.superSilentEnabled || !this.settings.legitAimbot || (this._aimError || 0) < 0.035;
+                        if (this.me.reloadTimer === 0 && !this.me.didShoot && confirmed && aimSettled) {
                             if (isMelee) {
                                 if (distance <= closeRange) { inputPacket[gameInputIndices.shoot] = 1; }
                                 else if (distance <= throwRange && this.me.weapon.canThrow) {
@@ -1982,7 +1988,7 @@
                     while (arr.length % stride !== 0 && stride < 100) stride++;
                     const cache = this.getEffectiveSkinCache();
                     for (let k = 0; k < arr.length; k += stride) {
-                        const isLocal = (socketId !== undefined && socketId !== -1 && arr[k] === socketId) || (this.me && arr[k + 5] === this.me.name) || arr.length === stride;
+                        const isLocal = (socketId !== undefined && socketId !== -1 && arr[k] === socketId) || (this.me && arr[k + 5] === this.me.name);
                         if (isLocal && cache) {
                             if (cache.main !== -1) arr[k + 12] = [cache.main, cache.secondary !== -1 ? cache.secondary : -1];
                             if (cache.hat !== -1) arr[k + 13] = cache.hat;
@@ -2059,6 +2065,7 @@
         }
 
         getSkinForPlayer(player, origSkins) {
+            if (!this._isLocalPlayer(player)) return origSkins || [-1, -1];
             const cache = this.getEffectiveSkinCache();
             if (cache && (cache.main !== -1 || cache.secondary !== -1)) {
                 return [cache.main !== -1 ? cache.main : (origSkins ? origSkins[0] : -1), cache.secondary !== -1 ? cache.secondary : (origSkins ? origSkins[1] : -1)];
@@ -2066,31 +2073,47 @@
             return origSkins || [-1, -1];
         }
 
+        _isLocalPlayer(player) {
+            try {
+                if (!player) return false;
+                if (player.isYou) return true;
+                if (this.me && player === this.me) return true;
+                const myName = this.me && this.me.name;
+                if (myName && player.name && player.name === myName) return true;
+            } catch (e) {}
+            return false;
+        }
+
         getMeleeForPlayer(player, origMelee) {
+            if (!this._isLocalPlayer(player)) return origMelee;
             const cache = this.getEffectiveSkinCache();
             if (cache && cache.knife !== -1) return cache.knife;
             return origMelee;
         }
 
         getHatForPlayer(player, orig) {
+            if (!this._isLocalPlayer(player)) return orig;
             const cache = this.getEffectiveSkinCache();
             if (cache && cache.hat !== -1) return cache.hat;
             return orig;
         }
 
         getBodyForPlayer(player, orig) {
+            if (!this._isLocalPlayer(player)) return orig;
             const cache = this.getEffectiveSkinCache();
             if (cache && cache.body !== -1) return cache.body;
             return orig;
         }
 
         getDyeForPlayer(player, orig) {
+            if (!this._isLocalPlayer(player)) return orig;
             const cache = this.getEffectiveSkinCache();
             if (cache && cache.dye !== -1) return cache.dye;
             return orig;
         }
 
         getWaistForPlayer(player, orig) {
+            if (!this._isLocalPlayer(player)) return orig;
             const cache = this.getEffectiveSkinCache();
             if (cache && cache.waist !== -1) return cache.waist;
             return orig;
