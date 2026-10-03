@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name             hvhm – Krunker Cheat
 // @namespace        https://github.com/hvhm/hvhm
-// @version          1.10.40
+// @version          1.10.41
 // @description      Krunker aimbot, ESP, skins, bhop and mod menu.
 // @author           hvhm
 // @match            *://krunker.io/*
@@ -279,7 +279,7 @@
                     try { this.notify({ title: 'Welcome', message: 'hvhm cheat loaded — press Insert for menu', timeout: 5000 }); } catch (e) {}
                 }
 
-            console.log("hvhm: Successfully Initialized! build 1.10.40-spinfix-10.0.0");
+            console.log("hvhm: Successfully Initialized! build 1.10.41-spinjitter-10.0.0");
             } catch (error) {
                 console.error('hvhm: FATAL ERROR during initialization.', error);
             }
@@ -1788,7 +1788,11 @@
                 const spinSteps = ((Math.round(this.antiAimAngle / stepAngle) % 8) + 8) % 8;
                 const spinYaw = realYaw + spinSteps * stepAngle;
                 inputPacket[idx.ydir] = spinYaw * 1000;
-                inputPacket[idx.xdir] = -Math.PI * 500;
+                // Pitch spam: alternate straight-down / straight-up every tick
+                // so the server-side model jitters violently while the local
+                // camera (untouched here) stays smooth.
+                this._spinTick = (this._spinTick || 0) + 1;
+                inputPacket[idx.xdir] = (this._spinTick % 2 === 0 ? -1 : 1) * Math.PI / 2 * 1000;
                 const moveIndex = inputPacket[idx.moveDir];
                 if (Number.isInteger(moveIndex) && moveIndex >= 0 && moveIndex < 8) {
                     // World move direction is movDirAngle - packetYaw, so the
