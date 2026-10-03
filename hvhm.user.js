@@ -4,7 +4,7 @@
 // @name:ja          hvhm – Krunker.IO チート
 // @name:az          hvhm – Krunker.IO Hilesi
 // @namespace        https://github.com/hvhm/hvhm
-// @version          1.10.28
+// @version          1.10.29
 // @description      Krunker.io Cheat 2026: Anime Aimbot, ESP/Wallhack, Free Skins, Bhop Script. Working & updated mod menu.
 // @description:tr   Krunker.io Hile 2026: Anime Aimbot, ESP/Wallhack, Bedava Skinler, Bhop Script. Çalışan güncel mod menü.
 // @description:ja   Krunker.io チート 2026: アニメエイムボット、ESP/ウォールハック、無料スキン、Bhopスクリプト。動作中の最新MODメニュー。
@@ -286,7 +286,7 @@
                     try { this.notify({ title: 'Welcome', message: 'hvhm cheat loaded — press Insert for menu', timeout: 5000 }); } catch (e) {}
                 }
 
-            console.log("hvhm: Successfully Initialized! build 1.10.28-10.0.0");
+            console.log("hvhm: Successfully Initialized! build 1.10.29-10.0.0");
             } catch (error) {
                 console.error('hvhm: FATAL ERROR during initialization.', error);
             }
@@ -634,6 +634,10 @@
                     r.onsuccess = () => { try { r.result.transaction('kv', 'readwrite').objectStore('kv').put({ data: gameJS }, 'hvhm_live_capture'); } catch (e) {} };
                 } catch (e) {}
                 window.__xVb92__ = 'aB7k2m9Pq';
+                // Loader-scope timer alias the decrypted client closes over
+                // (the official index bundle defines it; we removed that script).
+                window.JfCzGzvGIQB8rrJX = window.setTimeout;
+                window.JfCzGzvGIQB8rrJX.isProxy = true;
                 console.log('hvhm: Executing patched game client (' + this.gameVersion + ')...');
                 if (document.readyState === 'complete') Function(patchedScript)();
                 else window.addEventListener('load', () => { Function(patchedScript)(); });
