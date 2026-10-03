@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name             hvhm – Krunker Cheat
 // @namespace        https://github.com/hvhm/hvhm
-// @version          1.10.42
+// @version          1.10.44
 // @description      Krunker aimbot, ESP, skins, bhop and mod menu.
 // @author           hvhm
 // @match            *://krunker.io/*
@@ -96,6 +96,11 @@
             this.scriptUsers = new Map();
             this._scriptObserver = null;
             this._lastHvhmBeacon = 0;
+            // Every procInputs call (live tick plus prediction re-sims of old
+            // inputs) runs through our wrapper; only process each unique input
+            // packet once so movement compensation, spin phase, bhop toggles
+            // and one-shot sends never apply twice to the same packet.
+            this._seenInputs = new WeakSet();
             this.scriptVersion = '1.10.19';
             this.lobbyCheatUsers = new Map();
             this.lobbyHeartbeatInterval = null;
@@ -279,7 +284,7 @@
                     try { this.notify({ title: 'Welcome', message: 'hvhm cheat loaded — press Insert for menu', timeout: 5000 }); } catch (e) {}
                 }
 
-            console.log("hvhm: Successfully Initialized! build 1.10.42-alwaysspin-10.0.0");
+            console.log("hvhm: Successfully Initialized! build 1.10.44-stablemove-10.0.0");
             } catch (error) {
                 console.error('hvhm: FATAL ERROR during initialization.', error);
             }
@@ -835,7 +840,10 @@
                 const self = this;
                 this.me.procInputs = new Proxy(originalProcInputs, {
                     apply(target, thisArg, args) {
-                        if (thisArg) self.onProcessInputs(args[0], thisArg);
+                        if (thisArg && !self._seenInputs.has(args[0])) {
+                            self._seenInputs.add(args[0]);
+                            self.onProcessInputs(args[0], thisArg);
+                        }
                         return Reflect.apply(target, thisArg, args);
                     },
                     get(target, prop) {
@@ -1771,7 +1779,8 @@
 
             const inAir = !me.onGround;
             // Spin on ground and in the air alike; holding the Aero override
-            // hotkey pauses the spin.
+            // hotkey pauses the spin. Movement direction is preserved by the
+            // exact moveDir counter-rotation (applied once per input packet).
             const wantSpin = !this._aeroSpinOverrideHeld;
 
             if (wantSpin) {
