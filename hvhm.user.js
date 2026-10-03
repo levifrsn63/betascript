@@ -4,7 +4,7 @@
 // @name:ja          hvhm – Krunker.IO チート
 // @name:az          hvhm – Krunker.IO Hilesi
 // @namespace        https://github.com/hvhm/hvhm
-// @version          1.10.29
+// @version          1.10.30
 // @description      Krunker.io Cheat 2026: Anime Aimbot, ESP/Wallhack, Free Skins, Bhop Script. Working & updated mod menu.
 // @description:tr   Krunker.io Hile 2026: Anime Aimbot, ESP/Wallhack, Bedava Skinler, Bhop Script. Çalışan güncel mod menü.
 // @description:ja   Krunker.io チート 2026: アニメエイムボット、ESP/ウォールハック、無料スキン、Bhopスクリプト。動作中の最新MODメニュー。
@@ -286,7 +286,7 @@
                     try { this.notify({ title: 'Welcome', message: 'hvhm cheat loaded — press Insert for menu', timeout: 5000 }); } catch (e) {}
                 }
 
-            console.log("hvhm: Successfully Initialized! build 1.10.29-10.0.0");
+            console.log("hvhm: Successfully Initialized! build 1.10.30-readable-10.0.0");
             } catch (error) {
                 console.error('hvhm: FATAL ERROR during initialization.', error);
             }
@@ -681,36 +681,36 @@
       script = script.replace(/writable\s*:\s*false/g, "writable: true");
       script = script.replace(/configurable\s*:\s*false/g, "configurable: true");
       script = script.replace(/_dispatchEvent:\s*function\s*\(([^\s,)]+),\s*([^\s,)]+)\)\s*\{/u, "_dispatchEvent: function ($1, $2) { try { if (window.quirifyInstance) window.quirifyInstance.onNetDispatch(this, $1, $2); } catch(e){} ");
-      let _0x2480d3 = /(send:\s*function\s*\([^\s,)]+\)\s*\{[\s\n]*if\s*\(typeof\s+window\s*==\s*["']undefined["'][\s\S]*?arguments\[[^\s\]]+\];\s*\})/u;
-      script = script.replace(_0x2480d3, "$1 try { if (window.quirifyInstance) window.quirifyInstance.onNetSend(this, arguments[0], Array.prototype.slice.call(arguments, 1)); } catch(e){} ");
-      let _0x5c1ce7 = /(var\s+([^\s=]+)\s*=\s*([^\s=]+)\[([^\s=]+)\]\s*==\s*([^\s=]+)\.socketId;[\s\n]*\([^\s=]+\s*=\s*[^\s=.]+\.players\.add\()/u;
-      script = script.replace(_0x5c1ce7, (_0x1cb2eb, _0x396aa8, _0x80aa26, _0x43632a, _0x43b963, _0x580ca5) => {
-        return "var " + _0x80aa26 + " = " + _0x43632a + "[" + _0x43b963 + "] == " + _0x580ca5 + ".socketId;\ntry {\n    var _q = window.quirifyInstance;\n    var _isYou = " + _0x80aa26 + " || (_q && _q.me && " + _0x43632a + "[" + _0x43b963 + " + 5] === _q.me.name);\n    if (_isYou && _q && _q.settings && _q.settings.unlockSkins) {\n        var _sc = _q.getEffectiveSkinCache ? _q.getEffectiveSkinCache() : _q.skinCache;\n        if (_sc) {\n            if (_sc.main !== undefined && _sc.main !== -1) {\n                " + _0x43632a + "[" + _0x43b963 + " + 12] = [_sc.main, (_sc.secondary !== undefined && _sc.secondary !== -1) ? _sc.secondary : -1];\n            }\n            if (_sc.hat !== undefined && _sc.hat !== -1) " + _0x43632a + "[" + _0x43b963 + " + 13] = _sc.hat;\n            if (_sc.body !== undefined && _sc.body !== -1) " + _0x43632a + "[" + _0x43b963 + " + 14] = _sc.body;\n            if (_sc.knife !== undefined && _sc.knife !== -1) " + _0x43632a + "[" + _0x43b963 + " + 19] = _sc.knife;\n            if (_sc.dye !== undefined && _sc.dye !== -1) " + _0x43632a + "[" + _0x43b963 + " + 24] = _sc.dye;\n            if (_sc.waist !== undefined && _sc.waist !== -1) " + _0x43632a + "[" + _0x43b963 + " + 30] = _sc.waist;\n            if (_sc.back !== undefined && _sc.back !== -1) " + _0x43632a + "[" + _0x43b963 + " + 41] = _sc.back;\n            if (_sc.playerCard !== undefined && _sc.playerCard !== -1) " + _0x43632a + "[" + _0x43b963 + " + 43] = _sc.playerCard;\n        }\n    }\n} catch(e) {}\n" + _0x1cb2eb.substring(_0x1cb2eb.indexOf("("));
+      let sendHookRe = /(send:\s*function\s*\([^\s,)]+\)\s*\{[\s\n]*if\s*\(typeof\s+window\s*==\s*["']undefined["'][\s\S]*?arguments\[[^\s\]]+\];\s*\})/u;
+      script = script.replace(sendHookRe, "$1 try { if (window.quirifyInstance) window.quirifyInstance.onNetSend(this, arguments[0], Array.prototype.slice.call(arguments, 1)); } catch(e){} ");
+      let playersAddRe = /(var\s+([^\s=]+)\s*=\s*([^\s=]+)\[([^\s=]+)\]\s*==\s*([^\s=]+)\.socketId;[\s\n]*\([^\s=]+\s*=\s*[^\s=.]+\.players\.add\()/u;
+      script = script.replace(playersAddRe, (playersAddSrc, varDecl, isYouVar, playerArr, playerIdx, socketObj) => {
+        return "var " + isYouVar + " = " + playerArr + "[" + playerIdx + "] == " + socketObj + ".socketId;\ntry {\n    var _q = window.quirifyInstance;\n    var _isYou = " + isYouVar + " || (_q && _q.me && " + playerArr + "[" + playerIdx + " + 5] === _q.me.name);\n    if (_isYou && _q && _q.settings && _q.settings.unlockSkins) {\n        var _sc = _q.getEffectiveSkinCache ? _q.getEffectiveSkinCache() : _q.skinCache;\n        if (_sc) {\n            if (_sc.main !== undefined && _sc.main !== -1) {\n                " + playerArr + "[" + playerIdx + " + 12] = [_sc.main, (_sc.secondary !== undefined && _sc.secondary !== -1) ? _sc.secondary : -1];\n            }\n            if (_sc.hat !== undefined && _sc.hat !== -1) " + playerArr + "[" + playerIdx + " + 13] = _sc.hat;\n            if (_sc.body !== undefined && _sc.body !== -1) " + playerArr + "[" + playerIdx + " + 14] = _sc.body;\n            if (_sc.knife !== undefined && _sc.knife !== -1) " + playerArr + "[" + playerIdx + " + 19] = _sc.knife;\n            if (_sc.dye !== undefined && _sc.dye !== -1) " + playerArr + "[" + playerIdx + " + 24] = _sc.dye;\n            if (_sc.waist !== undefined && _sc.waist !== -1) " + playerArr + "[" + playerIdx + " + 30] = _sc.waist;\n            if (_sc.back !== undefined && _sc.back !== -1) " + playerArr + "[" + playerIdx + " + 41] = _sc.back;\n            if (_sc.playerCard !== undefined && _sc.playerCard !== -1) " + playerArr + "[" + playerIdx + " + 43] = _sc.playerCard;\n        }\n    }\n} catch(e) {}\n" + playersAddSrc.substring(playersAddSrc.indexOf("("));
       });
-      let _0x17b5e0 = /(\.skins\s*=\s*)([^\s=]+)(\s*\|\|\s*\[-1,\s*-1\]);/u;
-      script = script.replace(_0x17b5e0, "$1 ((window.quirifyInstance && window.quirifyInstance.settings && window.quirifyInstance.settings.unlockSkins && window.quirifyInstance.getSkinForPlayer) ? window.quirifyInstance.getSkinForPlayer(this, $2) : ($2 $3));");
-      let _0x49f5ed = /(\.meleeIndex\s*=\s*)([^\s=;]+);/u;
-      script = script.replace(_0x49f5ed, "$1 ((this.isYou && window.quirifyInstance && window.quirifyInstance.settings && window.quirifyInstance.settings.unlockSkins && window.quirifyInstance.getMeleeForPlayer) ? window.quirifyInstance.getMeleeForPlayer(this, $2) : $2);");
-      let _0x2c09f3 = null;
-      let _0x5c29a1 = 0;
-      while ((_0x5c29a1 = script.indexOf(".latestData", _0x5c29a1)) !== -1) {
-        const _0x2da5a7 = script.substring(Math.max(0, _0x5c29a1 - 300), _0x5c29a1 + 15);
-        const _0x5404ec = /\.([a-zA-Z0-9_$]+)\s*=\s*\([^;]+;\s*if\s*\([a-zA-Z0-9_$]+\.latestData/.exec(_0x2da5a7) || /([^\s=.]+)\.([^\s=]+)\s*=\s*\([^;]+;\s*if\s*\(\1\.latestData\)/.exec(_0x2da5a7);
-        if (_0x5404ec) {
-          _0x2c09f3 = _0x5404ec[2] || _0x5404ec[1];
+      let skinsRe = /(\.skins\s*=\s*)([^\s=]+)(\s*\|\|\s*\[-1,\s*-1\]);/u;
+      script = script.replace(skinsRe, "$1 ((window.quirifyInstance && window.quirifyInstance.settings && window.quirifyInstance.settings.unlockSkins && window.quirifyInstance.getSkinForPlayer) ? window.quirifyInstance.getSkinForPlayer(this, $2) : ($2 $3));");
+      let meleeRe = /(\.meleeIndex\s*=\s*)([^\s=;]+);/u;
+      script = script.replace(meleeRe, "$1 ((this.isYou && window.quirifyInstance && window.quirifyInstance.settings && window.quirifyInstance.settings.unlockSkins && window.quirifyInstance.getMeleeForPlayer) ? window.quirifyInstance.getMeleeForPlayer(this, $2) : $2);");
+      let inViewName = null;
+      let scanPos = 0;
+      while ((scanPos = script.indexOf(".latestData", scanPos)) !== -1) {
+        const scanWindow = script.substring(Math.max(0, scanPos - 300), scanPos + 15);
+        const inViewMatch = /\.([a-zA-Z0-9_$]+)\s*=\s*\([^;]+;\s*if\s*\([a-zA-Z0-9_$]+\.latestData/.exec(scanWindow) || /([^\s=.]+)\.([^\s=]+)\s*=\s*\([^;]+;\s*if\s*\(\1\.latestData\)/.exec(scanWindow);
+        if (inViewMatch) {
+          inViewName = inViewMatch[2] || inViewMatch[1];
           break;
         }
-        _0x5c29a1 += 11;
+        scanPos += 11;
       }
-      this.vars.inView = _0x2c09f3 || "cnSeen";
-      const _0xb14b6d = /(?:this\.active\s*=\s*true;)\s*this\.(\w+)\s*=\s*[^;]+;(?:\s*this\.\w+\s*=\s*[^;]+;){5}\s*this\.\w+\s*=\s*null;/s.exec(script);
-      this.vars.isYou = _0xb14b6d ? _0xb14b6d[1] : "isYou";
-      const _0x45484c = /this\.([^\s=]+)\s*=\s*new\s+[^\s]+\.Object3D\(\)/u.exec(script) || /['"]pchObjc['"]/.exec(script);
-      this.vars.pchObjc = _0x45484c ? _0x45484c[1] || "pchObjc" : "pchObjc";
-      const _0x3870aa = /this\[['"]([a-zA-Z0-9_$]+)['"]\]\s*\(\s*this\[['"]inputs['"]\]/.exec(script) || /for\s*\(\s*var\s+[^\s=]+\s*=\s*0;\s*[^\s<]+\s*<\s*this\.inputs\.length;\s*\+\+[^\s)]+\s*\)\s*\{[^}]*this\.([^\s(]+)\(/s.exec(script);
-      this.vars.procInputs = _0x3870aa ? _0x3870aa[1] || _0x3870aa[2] : "procInputs";
-      const _0x5b1bb7 = /this\[['"]ammos['"]\]\[this\[['"]([a-zA-Z0-9_$]+)['"]\]\]/.exec(script) || /this\[['"]ammos['"]\]\[this\.([a-zA-Z0-9_$]+)\]/.exec(script) || /\}\s*else\s*\{\s*this\.[^\s=\[]+\[this\.([^\s=\]]+)\]\s*=\s*[^;]+;\s*\}\s*[^.\s]+\.updatePlayerAmmo\(this\);/s.exec(script);
-      this.vars.weaponIndex = _0x5b1bb7 ? _0x5b1bb7[1] : "loadoutIndex";
+      this.vars.inView = inViewName || "cnSeen";
+      const isYouMatch = /(?:this\.active\s*=\s*true;)\s*this\.(\w+)\s*=\s*[^;]+;(?:\s*this\.\w+\s*=\s*[^;]+;){5}\s*this\.\w+\s*=\s*null;/s.exec(script);
+      this.vars.isYou = isYouMatch ? isYouMatch[1] : "isYou";
+      const pchObjcMatch = /this\.([^\s=]+)\s*=\s*new\s+[^\s]+\.Object3D\(\)/u.exec(script) || /['"]pchObjc['"]/.exec(script);
+      this.vars.pchObjc = pchObjcMatch ? pchObjcMatch[1] || "pchObjc" : "pchObjc";
+      const procInputsMatch = /this\[['"]([a-zA-Z0-9_$]+)['"]\]\s*\(\s*this\[['"]inputs['"]\]/.exec(script) || /for\s*\(\s*var\s+[^\s=]+\s*=\s*0;\s*[^\s<]+\s*<\s*this\.inputs\.length;\s*\+\+[^\s)]+\s*\)\s*\{[^}]*this\.([^\s(]+)\(/s.exec(script);
+      this.vars.procInputs = procInputsMatch ? procInputsMatch[1] || procInputsMatch[2] : "procInputs";
+      const weaponIndexMatch = /this\[['"]ammos['"]\]\[this\[['"]([a-zA-Z0-9_$]+)['"]\]\]/.exec(script) || /this\[['"]ammos['"]\]\[this\.([a-zA-Z0-9_$]+)\]/.exec(script) || /\}\s*else\s*\{\s*this\.[^\s=\[]+\[this\.([^\s=\]]+)\]\s*=\s*[^;]+;\s*\}\s*[^.\s]+\.updatePlayerAmmo\(this\);/s.exec(script);
+      this.vars.weaponIndex = weaponIndexMatch ? weaponIndexMatch[1] : "loadoutIndex";
       console.log("👑 hvhm: Fast Variable Hook Extracted:", this.vars);
       return script;
     }
