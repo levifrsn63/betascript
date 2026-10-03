@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name             hvhm – Krunker Cheat
 // @namespace        https://github.com/hvhm/hvhm
-// @version          1.10.37
+// @version          1.10.38
 // @description      Krunker aimbot, ESP, skins, bhop and mod menu.
 // @author           hvhm
 // @match            *://krunker.io/*
@@ -278,7 +278,7 @@
                     try { this.notify({ title: 'Welcome', message: 'hvhm cheat loaded — press Insert for menu', timeout: 5000 }); } catch (e) {}
                 }
 
-            console.log("hvhm: Successfully Initialized! build 1.10.37-screenfire-10.0.0");
+            console.log("hvhm: Successfully Initialized! build 1.10.38-antigrace-10.0.0");
             } catch (error) {
                 console.error('hvhm: FATAL ERROR during initialization.', error);
             }
@@ -1642,6 +1642,7 @@
             }
 
             if (target && this.me.reloadTimer === 0 && this.game.gameState !== 4 && this.game.gameState !== 5) {
+                this._lastAimTargetAt = Date.now();
                 const isMelee = this.me.weapon.melee; const closeRange = 17.6; const throwRange = 65.2;
                 const distance = Math.sqrt(this.getDistanceSq(this.me, target));
 
@@ -1754,7 +1755,13 @@
                 if (!this.settings.superSilentEnabled && !this.settings.antiAimEnabled && !this.settings.antiAimSpinEnabled) {
                     this.resetLookAt();
                 }
-                if ((this.settings.antiAimEnabled || this.settings.antiAimSpinEnabled) && !this.me.didShoot) {
+                // Grace period: acquisition flickers at FOV/wall edges, and
+                // slamming anti-aim pitch down between flickers fights the
+                // aimbot and reads as "aims down when locking on". Only engage
+                // anti-aim once truly targetless for a while; otherwise leave
+                // the camera where the aimbot left it.
+                const quietMs = Date.now() - (this._lastAimTargetAt || 0);
+                if ((this.settings.antiAimEnabled || this.settings.antiAimSpinEnabled) && !this.me.didShoot && quietMs > 350) {
                     this.applyAntiAim(inputPacket, gameInputIndices);
                 }
                 this.updateFOV();
