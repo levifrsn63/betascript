@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name             hvhm – Krunker Cheat
 // @namespace        https://github.com/hvhm/hvhm
-// @version          1.10.44
+// @version          1.10.45
 // @description      Krunker aimbot, ESP, skins, bhop and mod menu.
 // @author           hvhm
 // @match            *://krunker.io/*
@@ -284,7 +284,7 @@
                     try { this.notify({ title: 'Welcome', message: 'hvhm cheat loaded — press Insert for menu', timeout: 5000 }); } catch (e) {}
                 }
 
-            console.log("hvhm: Successfully Initialized! build 1.10.44-stablemove-10.0.0");
+            console.log("hvhm: Successfully Initialized! build 1.10.45-socketfix-10.0.0");
             } catch (error) {
                 console.error('hvhm: FATAL ERROR during initialization.', error);
             }
@@ -555,7 +555,12 @@
             window.fetch = new Proxy(window.fetch, {
                 apply: async (target, thisArg, [u, ...rest]) => {
                     if (typeof u === 'string' && u.includes('/seek-game')) {
-                        const tok = await tokenPromise.catch(() => ({}));
+                        // Never hang matchmaking on the token iframe: fall back
+                        // to the unmodified request if no token arrives in time.
+                        const tok = await Promise.race([
+                            tokenPromise.catch(() => ({})),
+                            new Promise(r => setTimeout(() => r({}), 5000))
+                        ]);
                         if (tok && tok.v) {
                             try {
                                 const url = new URL(u, location.origin);
@@ -764,7 +769,7 @@
                             cheatInstance.socket = this; cheatInstance.wsEvent = this._dispatchEvent.bind(this); cheatInstance.wsSend = this.send.bind(this);
                             const _origSend = this.send;
                             this.send = function (type, ...message) {
-                                if (type == "ah2") return; let data = message[0];
+                                let data = message[0];
                                 if (type === 'en' && data) { cheatInstance.skinCache = { main: data[2][0], secondary: data[2][1], hat: data[3], body: data[4], knife: data[9], dye: data[14], waist: data[17], playerCard: data[32] }; }
                                 if (cheatInstance.settings.unlockSkins && type === '0' && Array.isArray(message[0])) cheatInstance.patchLocalCosmeticPacket(message[0]);
                                 if (cheatInstance.settings.unlockSkins && type === 'spry' && data && data !== 4577) { cheatInstance.skinCache.spray = data; }
