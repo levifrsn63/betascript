@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name             hvhm – Krunker Cheat
 // @namespace        https://github.com/hvhm/hvhm
-// @version          1.10.36
+// @version          1.10.37
 // @description      Krunker aimbot, ESP, skins, bhop and mod menu.
 // @author           hvhm
 // @match            *://krunker.io/*
@@ -278,7 +278,7 @@
                     try { this.notify({ title: 'Welcome', message: 'hvhm cheat loaded — press Insert for menu', timeout: 5000 }); } catch (e) {}
                 }
 
-            console.log("hvhm: Successfully Initialized! build 1.10.36-qtab-10.0.0");
+            console.log("hvhm: Successfully Initialized! build 1.10.37-screenfire-10.0.0");
             } catch (error) {
                 console.error('hvhm: FATAL ERROR during initialization.', error);
             }
@@ -1721,19 +1721,31 @@
                     }
 
                     if (this.settings.autoFireEnabled) {
-                        this.playerMaps.length = 0; this.rayC.setFromCamera(this.vec2, this.renderer.fpsCamera);
-                        this.playerMaps = this.game.players.list.map(p => p.objInstances).filter(Boolean);
-                        const inCast = this.rayC.intersectObjects(this.playerMaps, true).length;
-                        const canSee = target.objInstances && this.containsPoint(target.objInstances.position);
-                        if (isMelee) {
-                            if (distance <= closeRange && this.me.reloadTimer === 0 && !this.me.didShoot && this.me.aimVal === 0 && (!this.settings.legitAimbot || (inCast && canSee))) { inputPacket[gameInputIndices.shoot] = 1; }
-                            else if (distance <= throwRange && this.me.weapon.canThrow) {
-                                inputPacket[gameInputIndices.scope] = 1;
-                                if (this.me.aimVal === 0 && this.me.reloadTimer === 0 && !this.me.didShoot && (!this.settings.legitAimbot || (inCast && canSee))) { inputPacket[gameInputIndices.shoot] = 1; }
+                        // Screen-space confirmation instead of a scene raycast:
+                        // batched player bodies don't live under objInstances, so
+                        // raycasts can't see them. Fire once the aim point itself
+                        // renders near the crosshair.
+                        let confirmed = true;
+                        if (this.settings.legitAimbot) {
+                            const aimScreen = this.world2Screen({ x: target.x, y: targetY, z: target.z });
+                            const cx = this.overlay.canvas.width / 2;
+                            const cy = this.overlay.canvas.height / 2;
+                            confirmed = !!aimScreen && Math.hypot(aimScreen.x - cx, aimScreen.y - cy) < 40 &&
+                                target.objInstances && this.containsPoint(target.objInstances.position);
+                        }
+                        // No aimVal gate: holding scope keeps aimVal above 0, which
+                        // would strangle autofire to a single shot per acquisition.
+                        if (this.me.reloadTimer === 0 && !this.me.didShoot && confirmed) {
+                            if (isMelee) {
+                                if (distance <= closeRange) { inputPacket[gameInputIndices.shoot] = 1; }
+                                else if (distance <= throwRange && this.me.weapon.canThrow) {
+                                    inputPacket[gameInputIndices.scope] = 1;
+                                    inputPacket[gameInputIndices.shoot] = 1;
+                                }
+                            } else {
+                                if (!this.me.weapon.noAim) inputPacket[gameInputIndices.scope] = 1;
+                                inputPacket[gameInputIndices.shoot] = 1;
                             }
-                        } else {
-                            if (!this.me.weapon.noAim) inputPacket[gameInputIndices.scope] = 1;
-                            if ((this.me.weapon.noAim || this.me.aimVal === 0) && this.me.reloadTimer === 0 && !this.me.didShoot && (!this.settings.legitAimbot || (inCast && canSee))) { inputPacket[gameInputIndices.shoot] = 1; }
                         }
                     }
                 }
