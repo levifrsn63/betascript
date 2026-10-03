@@ -1,14 +1,8 @@
 // ==UserScript==
-// @name             hvhm – Krunker.IO Cheat
-// @name:tr          hvhm – Krunker.IO Hilesi
-// @name:ja          hvhm – Krunker.IO チート
-// @name:az          hvhm – Krunker.IO Hilesi
+// @name             hvhm – Krunker Cheat
 // @namespace        https://github.com/hvhm/hvhm
-// @version          1.10.34
-// @description      Krunker.io Cheat 2026: Anime Aimbot, ESP/Wallhack, Free Skins, Bhop Script. Working & updated mod menu.
-// @description:tr   Krunker.io Hile 2026: Anime Aimbot, ESP/Wallhack, Bedava Skinler, Bhop Script. Çalışan güncel mod menü.
-// @description:ja   Krunker.io チート 2026: アニメエイムボット、ESP/ウォールハック、無料スキン、Bhopスクリプト。動作中の最新MODメニュー。
-// @description:az   Krunker.io Hilesi 2026: Anime Aimbot, ESP/Wallhack, Pulsuz Skinlər, Bhop Skript. İşlək ve güncəl mod menyu.
+// @version          1.10.35
+// @description      Krunker aimbot, ESP, skins, bhop and mod menu.
 // @author           hvhm
 // @match            *://krunker.io/*
 // @match            *://*.browserfps.com/*
@@ -286,7 +280,7 @@
                     try { this.notify({ title: 'Welcome', message: 'hvhm cheat loaded — press Insert for menu', timeout: 5000 }); } catch (e) {}
                 }
 
-            console.log("hvhm: Successfully Initialized! build 1.10.34-tightfire-10.0.0");
+            console.log("hvhm: Successfully Initialized! build 1.10.35-qaim-10.0.0");
             } catch (error) {
                 console.error('hvhm: FATAL ERROR during initialization.', error);
             }
@@ -1662,10 +1656,31 @@
 
                 if (isMelee && distance > (this.me.weapon.canThrow ? throwRange : closeRange)) { }
                 else {
-                    const aimPoint = this.getAimPoint(target);
-                    const targetY = aimPoint.y + (Number(this.settings.aimOffset) || 0);
-                    const yDire = this.getDirection(this.me.z, this.me.x, aimPoint.z, aimPoint.x);
-                    const xDire = this.getXDirection(this.me.x, this.me.y, this.me.z, aimPoint.x, targetY, aimPoint.z) - (0.3 * this.me.recoilAnimY);
+                    // Aim-spot + eye-height math ported from Quirify's client:
+                    // fractional heights scale with crouch, pitch is computed
+                    // from the eye (not the feet).
+                    let targetY;
+                    if (target.isBot) {
+                        targetY = target.y - target.dat.mSize / 2;
+                    } else {
+                        const targetHeight = (target.height || this.PLAYER_HEIGHT) - ((target.crouchVal || 0) * this.CROUCH_FACTOR);
+                        let spot = this.settings.aimTarget || 'head';
+                        if (spot === 'random') {
+                            const r = Math.random();
+                            spot = r < 0.33 ? 'head' : r < 0.66 ? 'torso' : 'legs';
+                        }
+                        const off = (Number(this.settings.aimOffset) || 0);
+                        switch (spot) {
+                            case 'head': targetY = target.y + targetHeight * 0.88 + off; break;
+                            case 'torso': targetY = target.y + targetHeight * 0.55 + off; break;
+                            case 'legs': targetY = target.y + targetHeight * 0.15 + off; break;
+                            default: targetY = target.y + targetHeight * 0.88 + off; break;
+                        }
+                    }
+                    const yDire = this.getDirection(this.me.z, this.me.x, target.z, target.x);
+                    const eyeHeight = (this.me.height || this.PLAYER_HEIGHT) - ((this.me.crouchVal || 0) * this.CROUCH_FACTOR);
+                    const eyeY = this.me.y + eyeHeight - this.CAMERA_HEIGHT;
+                    const xDire = this.getXDirection(this.me.x, eyeY, this.me.z, target.x, targetY, target.z) - this.me.recoilAnimY * 0.3;
 
                     // Keep the original smooth target interpolation for both
                     // visible and silent aim. Silent aim only suppresses camera
@@ -1709,11 +1724,9 @@
 
                         if (!this.settings.superSilentEnabled) this.lookDir(newX, newY);
                         inputPacket[gameInputIndices.xdir] = newX * 1000; inputPacket[gameInputIndices.ydir] = newY * 1000;
-                        this._aimError = Math.abs(shortestAngleY) + Math.abs(shortestAngleX);
                     } else {
                         if (!this.settings.superSilentEnabled) this.lookDir(xDire, yDire);
                         inputPacket[gameInputIndices.xdir] = xDire * 1000; inputPacket[gameInputIndices.ydir] = yDire * 1000;
-                        this._aimError = 0;
                     }
 
                     if (this.settings.autoFireEnabled) {
@@ -1721,24 +1734,15 @@
                         this.playerMaps = this.game.players.list.map(p => p.objInstances).filter(Boolean);
                         const inCast = this.rayC.intersectObjects(this.playerMaps, true).length;
                         const canSee = target.objInstances && this.containsPoint(target.objInstances.position);
-                        const confirmed = !this.settings.legitAimbot || (inCast && canSee);
-                        // Don't waste the first shot: fire only once the gun is
-                        // truly on target (tight angular convergence) and, for
-                        // scoped weapons, fully scoped in. Snap aim and silent aim
-                        // converge instantly and skip the wait.
-                        const aimSettled = this.settings.superSilentEnabled || !this.settings.legitAimbot || (this._aimError || 0) < 0.012;
-                        const scopeReady = this.me.weapon.noAim || (Number(this.me.aimVal) || 0) >= 0.85;
-                        if (this.me.reloadTimer === 0 && !this.me.didShoot && confirmed && aimSettled && (isMelee || scopeReady)) {
-                            if (isMelee) {
-                                if (distance <= closeRange) { inputPacket[gameInputIndices.shoot] = 1; }
-                                else if (distance <= throwRange && this.me.weapon.canThrow) {
-                                    inputPacket[gameInputIndices.scope] = 1;
-                                    inputPacket[gameInputIndices.shoot] = 1;
-                                }
-                            } else {
-                                if (!this.me.weapon.noAim) inputPacket[gameInputIndices.scope] = 1;
-                                inputPacket[gameInputIndices.shoot] = 1;
+                        if (isMelee) {
+                            if (distance <= closeRange && this.me.reloadTimer === 0 && !this.me.didShoot && this.me.aimVal === 0 && (!this.settings.legitAimbot || (inCast && canSee))) { inputPacket[gameInputIndices.shoot] = 1; }
+                            else if (distance <= throwRange && this.me.weapon.canThrow) {
+                                inputPacket[gameInputIndices.scope] = 1;
+                                if (this.me.aimVal === 0 && this.me.reloadTimer === 0 && !this.me.didShoot && (!this.settings.legitAimbot || (inCast && canSee))) { inputPacket[gameInputIndices.shoot] = 1; }
                             }
+                        } else {
+                            if (!this.me.weapon.noAim) inputPacket[gameInputIndices.scope] = 1;
+                            if ((this.me.weapon.noAim || this.me.aimVal === 0) && this.me.reloadTimer === 0 && !this.me.didShoot && (!this.settings.legitAimbot || (inCast && canSee))) { inputPacket[gameInputIndices.shoot] = 1; }
                         }
                     }
                 }
