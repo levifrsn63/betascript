@@ -4,7 +4,7 @@
 // @name:ja          hvhm – Krunker.IO チート
 // @name:az          hvhm – Krunker.IO Hilesi
 // @namespace        https://github.com/hvhm/hvhm
-// @version          1.10.33
+// @version          1.10.34
 // @description      Krunker.io Cheat 2026: Anime Aimbot, ESP/Wallhack, Free Skins, Bhop Script. Working & updated mod menu.
 // @description:tr   Krunker.io Hile 2026: Anime Aimbot, ESP/Wallhack, Bedava Skinler, Bhop Script. Çalışan güncel mod menü.
 // @description:ja   Krunker.io チート 2026: アニメエイムボット、ESP/ウォールハック、無料スキン、Bhopスクリプト。動作中の最新MODメニュー。
@@ -286,7 +286,7 @@
                     try { this.notify({ title: 'Welcome', message: 'hvhm cheat loaded — press Insert for menu', timeout: 5000 }); } catch (e) {}
                 }
 
-            console.log("hvhm: Successfully Initialized! build 1.10.33-skinscope-settlefire-10.0.0");
+            console.log("hvhm: Successfully Initialized! build 1.10.34-tightfire-10.0.0");
             } catch (error) {
                 console.error('hvhm: FATAL ERROR during initialization.', error);
             }
@@ -1722,11 +1722,13 @@
                         const inCast = this.rayC.intersectObjects(this.playerMaps, true).length;
                         const canSee = target.objInstances && this.containsPoint(target.objInstances.position);
                         const confirmed = !this.settings.legitAimbot || (inCast && canSee);
-                        // Don't waste the first shot while legit smoothing is still
-                        // traveling: fire only once the camera has converged onto the
-                        // target. Snap aim and silent aim converge instantly.
-                        const aimSettled = this.settings.superSilentEnabled || !this.settings.legitAimbot || (this._aimError || 0) < 0.035;
-                        if (this.me.reloadTimer === 0 && !this.me.didShoot && confirmed && aimSettled) {
+                        // Don't waste the first shot: fire only once the gun is
+                        // truly on target (tight angular convergence) and, for
+                        // scoped weapons, fully scoped in. Snap aim and silent aim
+                        // converge instantly and skip the wait.
+                        const aimSettled = this.settings.superSilentEnabled || !this.settings.legitAimbot || (this._aimError || 0) < 0.012;
+                        const scopeReady = this.me.weapon.noAim || (Number(this.me.aimVal) || 0) >= 0.85;
+                        if (this.me.reloadTimer === 0 && !this.me.didShoot && confirmed && aimSettled && (isMelee || scopeReady)) {
                             if (isMelee) {
                                 if (distance <= closeRange) { inputPacket[gameInputIndices.shoot] = 1; }
                                 else if (distance <= throwRange && this.me.weapon.canThrow) {
