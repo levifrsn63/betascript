@@ -4,7 +4,7 @@
 // @name:ja          hvhm – Krunker.IO チート
 // @name:az          hvhm – Krunker.IO Hilesi
 // @namespace        https://github.com/hvhm/hvhm
-// @version          1.10.31
+// @version          1.10.32
 // @description      Krunker.io Cheat 2026: Anime Aimbot, ESP/Wallhack, Free Skins, Bhop Script. Working & updated mod menu.
 // @description:tr   Krunker.io Hile 2026: Anime Aimbot, ESP/Wallhack, Bedava Skinler, Bhop Script. Çalışan güncel mod menü.
 // @description:ja   Krunker.io チート 2026: アニメエイムボット、ESP/ウォールハック、無料スキン、Bhopスクリプト。動作中の最新MODメニュー。
@@ -286,7 +286,7 @@
                     try { this.notify({ title: 'Welcome', message: 'hvhm cheat loaded — press Insert for menu', timeout: 5000 }); } catch (e) {}
                 }
 
-            console.log("hvhm: Successfully Initialized! build 1.10.31-batchchams-10.0.0");
+            console.log("hvhm: Successfully Initialized! build 1.10.32-batchchams-10.0.0");
             } catch (error) {
                 console.error('hvhm: FATAL ERROR during initialization.', error);
             }
@@ -1249,22 +1249,28 @@
                 // individual meshes that chams can recolor (takes effect as players
                 // respawn). Every batch call site is truthiness-guarded except the
                 // per-frame cosmeticBatch.update(), which the stub provides.
-                const renderer = this.renderer;
-                if (renderer && renderer.playerBatch && !renderer.__hvhmBatchStub) {
-                    renderer.__hvhmBatchStub = {
-                        playerBatch: renderer.playerBatch,
-                        cosmeticBatch: renderer.cosmeticBatch
-                    };
-                    renderer.playerBatch = {
-                        setPart: (player, part, mesh) => mesh,
-                        release: () => {},
-                        update: () => {}
-                    };
-                    renderer.cosmeticBatch = {
-                        add: () => {},
-                        release: () => {},
-                        update: () => {}
-                    };
+                // The batch owner may be the renderer or game.render depending on
+                // build, so stub whichever object actually carries it.
+                const batchOwners = [this.renderer, this.game && this.game.render, this.game]
+                    .filter((o, i, arr) => o && typeof o === 'object' && arr.indexOf(o) === i);
+                for (const owner of batchOwners) {
+                    if (owner.playerBatch && !owner.__hvhmBatchStub) {
+                        console.log('hvhm: stubbing player batches for chams (takes effect on respawn)');
+                        owner.__hvhmBatchStub = {
+                            playerBatch: owner.playerBatch,
+                            cosmeticBatch: owner.cosmeticBatch
+                        };
+                        owner.playerBatch = {
+                            setPart: (player, part, mesh) => mesh,
+                            release: () => {},
+                            update: () => {}
+                        };
+                        owner.cosmeticBatch = {
+                            add: () => {},
+                            release: () => {},
+                            update: () => {}
+                        };
+                    }
                 }
                 return;
             }
@@ -1273,11 +1279,15 @@
                 this._chamsLODState = null;
             }
             const renderer = this.renderer;
-            const stub = renderer && renderer.__hvhmBatchStub;
-            if (stub) {
-                renderer.playerBatch = stub.playerBatch;
-                renderer.cosmeticBatch = stub.cosmeticBatch;
-                delete renderer.__hvhmBatchStub;
+            const stubOwners = [this.renderer, this.game && this.game.render, this.game]
+                .filter((o, i, arr) => o && typeof o === 'object' && arr.indexOf(o) === i);
+            for (const owner of stubOwners) {
+                const stub = owner.__hvhmBatchStub;
+                if (stub) {
+                    owner.playerBatch = stub.playerBatch;
+                    owner.cosmeticBatch = stub.cosmeticBatch;
+                    delete owner.__hvhmBatchStub;
+                }
             }
         }
 
