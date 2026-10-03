@@ -4,7 +4,7 @@
 // @name:ja          hvhm – Krunker.IO チート
 // @name:az          hvhm – Krunker.IO Hilesi
 // @namespace        https://github.com/hvhm/hvhm
-// @version          1.9.9
+// @version          1.10.28
 // @description      Krunker.io Cheat 2026: Anime Aimbot, ESP/Wallhack, Free Skins, Bhop Script. Working & updated mod menu.
 // @description:tr   Krunker.io Hile 2026: Anime Aimbot, ESP/Wallhack, Bedava Skinler, Bhop Script. Çalışan güncel mod menü.
 // @description:ja   Krunker.io チート 2026: アニメエイムボット、ESP/ウォールハック、無料スキン、Bhopスクリプト。動作中の最新MODメニュー。
@@ -15,22 +15,22 @@
 // @exclude          *://krunker.io/social*
 // @exclude          *://krunker.io/editor*
 // @exclude          *://krunker.io/viewer*
-// @icon
 // @grant            none
-// @supportURL       https://github.com/hvhm/hvhm/issues/new?labels=bug&type=bug&template=bug_report.md&title=Bug+Report
-// @homepage         https://github.com/hvhm/hvhm
+// @supportURL       https://github.com/levifrsn63/krunker-loader/issues
+// @homepage         https://github.com/levifrsn63/krunker-loader
 // @run-at           document-start
 // @tag              games
 // @license          MIT
 // @noframes
 // ==/UserScript==
-// == KrunkerHVH passive debug panel ==
+
 (function(){
   var p=null,buf=[],shown=false;
   function flush(){ if(!p)return; p.textContent=buf.join('\n'); }
   function log(m){ buf.push(m); if(buf.length>400)buf.shift(); flush(); }
-  window.addEventListener('error',function(e){ log('PAGE ERROR: '+(e&&e.message)+((e&&e.filename)?' @'+e.filename+':'+e.lineno:'')); });
-  window.addEventListener('unhandledrejection',function(e){ log('REJECT: '+(e&&e.reason&&(e.reason.message||e.reason))); });
+  function stackOf(err){ try { var s=(err&&err.stack)||''; return s?s.split('\n').slice(0,7).join(' <- '):''; } catch(e){ return ''; } }
+  window.addEventListener('error',function(e){ log('PAGE ERROR: '+(e&&e.message)+((e&&e.filename)?' @'+e.filename+':'+e.lineno:'')+' '+stackOf(e&&e.error)); });
+  window.addEventListener('unhandledrejection',function(e){ log('REJECT: '+(e&&e.reason&&(e.reason.message||e.reason))+' '+stackOf(e&&e.reason)); });
   var _cl=console.log.bind(console); console.log=function(){ try{var s=Array.prototype.map.call(arguments,function(x){try{return typeof x==='string'?x:JSON.stringify(x);}catch(e){return ''+x;}}).join(' '); log(s);}catch(e){} return _cl.apply(console,arguments); };
   window.addEventListener('DOMContentLoaded',function(){
     p=document.createElement('div'); p.id='khvh-debug';
@@ -42,16 +42,20 @@
     shown=!shown;
     if(p)p.style.display=shown?'block':'none';
   });
-  console.log('[KrunkerHVH] loader active — game source -> game_3_0.js');
+  console.log('[KrunkerHVH] loader active — game mirror 10.0.0 + live capture (build-agnostic)');
   window['__xVb92__']='aB7k2m9Pq';
+  window.OffCliV = true;
+  // Stash hook for deobf pipeline: the loader saves the downloaded game
+  // source to window.__hvhmGameSource + IndexedDB after patching.
+  // window.Function stays 100% native (Quirify parity).
 })();
-
 
 (function(uniqueId, CRC2d) {
 
     class hvhm {
         constructor() {
             console.log("hvhm: Initializing...");
+            window.quirifyInstance = this;
 
             this.GUI = {};
             this.game = null;
@@ -69,6 +73,7 @@
             this.exports = null;
             this.gameVersion = '';
             this.gameJS = '';
+            this.liveBuildHash = '';
             this.notifyContainer = null;
             this.legitTarget = null;
             this.lastTargetChangeTime = 0;
@@ -97,6 +102,19 @@
             this.scriptUsers = new Map();
             this._scriptObserver = null;
             this._lastHvhmBeacon = 0;
+            this.scriptVersion = '1.10.19';
+            this.lobbyCheatUsers = new Map();
+            this.lobbyHeartbeatInterval = null;
+            this.lobbyFetchInterval = null;
+            this.sendLobbyHeartbeat = null;
+            this.myRole = null;
+            this.heartbeatFailCount = 0;
+            this._teamWithCheatersLastEnabled = 0;
+            this._teamWithCheatersToggledOnTime = 0;
+            this._lastTeamWithCheatersState = false;
+            this.featureStatuses = {};
+            this.featureStatusLastFetch = 0;
+            this.currentPreset = null;
 
             this.lastWireframeState = null;
 
@@ -132,7 +150,7 @@
                 triggerbotEnabled: false,
                 fovSize: 90,
                 aimOffset: 0,
-                aimBone: 'head',
+                aimTarget: 'head',
                 drawFovCircle: false,
                 espLines: true,
             espBoxMode: "3d",
@@ -149,6 +167,7 @@
                 antiAimSpinEnabled: false,
                 scriptNetEnabled: true,
                 spectatorAlertEnabled: true,
+                captureSafeOverlay: false,
             espColor: "#ffffff",
             boxColor: "#ffffff",
             esp3DBoxColor: "#ffffff",
@@ -202,12 +221,28 @@
             chamsVisibleColor: "#ffffff",
             chamsOpacity: 1.0,
             chamsSelf: false,
+            chamsTeammates: false,
                 antiAimSpinSpeed: 300,
                 noRecoil: false,
                 bulletTracers: false,
                 hitmarkers: false,
                 customSoundPack: 'off',
                 onlineSoundPackUrl: '',
+                legitAiAim: false,
+                espSquare: true,
+                espHealth: true,
+                espInfoBackground: true,
+                rainbowEsp: false,
+                weaponZoom: 1,
+                unlockPremium: true,
+                middleMouseMenu: false,
+                hideMenuButton: false,
+                showWelcome: true,
+                showCheaterRadar: true,
+                hideFromRadar: false,
+                cheaterTagColor: '#ff0000',
+                teamWithCheaters: false,
+                showFeatureStatus: true,
             };
             this.defaultHotkeys = {
                 toggleMenu: 'Insert',
@@ -229,6 +264,8 @@
                 aimbotWallBangs: 'Numpad6',
                 espLines: 'Numpad7',
                 espNameTags: 'Numpad8',
+                espSquare: 'F3',
+                panicKey: null,
             };
             this.settings = {};
             this.hotkeys = {};
@@ -242,8 +279,14 @@
                     this.initGameGUI();
                 });
                 this.addEventListeners();
+                try { this.startLobbyHeartbeat(); } catch (e) {}
+                try { this.fetchFeatureStatuses(); } catch (e) {}
+                try { this.checkForUpdates(); } catch (e) {}
+                if (this.settings.showWelcome) {
+                    try { this.notify({ title: 'Welcome', message: 'hvhm cheat loaded — press Insert for menu', timeout: 5000 }); } catch (e) {}
+                }
 
-            console.log("hvhm: Successfully Initialized! build 1.9.9-raised-skeleton-arms");
+            console.log("hvhm: Successfully Initialized! build 1.10.28-10.0.0");
             } catch (error) {
                 console.error('hvhm: FATAL ERROR during initialization.', error);
             }
@@ -265,6 +308,10 @@
                 this.settings.espBoxMode = loadedSettings && loadedSettings.esp3DBoxes ? '3d' : (loadedSettings && loadedSettings.espSquare ? '2d' : 'off');
             }
             if (!loadedSettings || !loadedSettings.espBoxColor) this.settings.espBoxColor = (loadedSettings && (loadedSettings.esp3DBoxColor || loadedSettings.esp2DBoxColor)) || '#ffffff';
+            if ((!loadedSettings || !loadedSettings.aimTarget) && loadedSettings && loadedSettings.aimBone) {
+                const aimMap = { head: 'head', neck: 'head', chest: 'torso', pelvis: 'legs' };
+                this.settings.aimTarget = aimMap[loadedSettings.aimBone] || 'head';
+            }
             if (!loadedSettings || !loadedSettings.chamsMode) this.settings.chamsMode = loadedSettings && loadedSettings.rgbChams ? 'rgb' : 'static';
             if (!loadedSettings || !loadedSettings.chamsColor) this.settings.chamsColor = (loadedSettings && loadedSettings.chamsEnemyColor) || '#ff0000';
             this.hotkeys = { ...this.defaultHotkeys, ...loadedHotkeys };
@@ -325,6 +372,37 @@
             } catch (error) {
                 this.notify({ title: 'Settings', message: `Could not import code: ${error.message}` });
             }
+        }
+
+        getNamedConfigs() {
+            try {
+                const parsed = JSON.parse(localStorage.getItem('hvhm_named_configs') || '{}');
+                return parsed && typeof parsed === 'object' ? parsed : {};
+            } catch (e) { return {}; }
+        }
+
+        saveNamedConfig(name) {
+            const cleanName = String(name || '').trim().slice(0, 32);
+            if (!cleanName) return false;
+            const configs = this.getNamedConfigs();
+            configs[cleanName] = { code: this.exportSettingsCode(), updated: Date.now() };
+            localStorage.setItem('hvhm_named_configs', JSON.stringify(configs));
+            return true;
+        }
+
+        loadNamedConfig(name) {
+            const entry = this.getNamedConfigs()[String(name || '')];
+            if (!entry || !entry.code) return false;
+            this.importSettingsCode(entry.code);
+            return true;
+        }
+
+        deleteNamedConfig(name) {
+            const configs = this.getNamedConfigs();
+            if (!configs[name]) return false;
+            delete configs[name];
+            localStorage.setItem('hvhm_named_configs', JSON.stringify(configs));
+            return true;
         }
 
         updateCustomSoundPack() {
@@ -462,82 +540,176 @@
         }
 
         initializeLoader() {
-            let tokenPromiseResolve;
-            const tokenPromise = new Promise((resolve) => (tokenPromiseResolve = resolve));
-            const ifr = document.createElement('iframe');
-            ifr.src = location.origin + '/' + (window.location.search ? window.location.search : '');
-            ifr.style.display = 'none';
-            document.documentElement.append(ifr);
-            const _ifrFetch = ifr.contentWindow.fetch;
-            ifr.contentWindow.fetch = function (u, ...r) { if (typeof u === "string" && u.includes("/seek-game")) { ifr.remove(); tokenPromiseResolve(u); return; } return _ifrFetch.apply(this, [u, ...r]); };
-            const _winFetch = window.fetch;
-            window.fetch = async function (u, ...r) { if (typeof u === "string" && u.includes("/seek-game") && !u.includes("captchaToken")) u = await tokenPromise; return _winFetch.apply(this, [u, ...r]); };
-            function downloadFileSync(url) { var req = new XMLHttpRequest(); req.open('GET', url, false); req.send(); if (req.status === 200) { return req.response; } return null; }
-            const GAME_CACHE_KEY = 'hvhm_game_3_0';
-            function idbOpen() { return new Promise((resolve, reject) => { const r = indexedDB.open('hvhm_gamecache', 1); r.onupgradeneeded = () => { const db = r.result; if (!db.objectStoreNames.contains('kv')) db.createObjectStore('kv'); }; r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); }); }
-            function idbGet(key) { return idbOpen().then(db => new Promise((resolve) => { try { const tx = db.transaction('kv', 'readonly'); const req = tx.objectStore('kv').get(key); req.onsuccess = () => resolve(req.result ? req.result.data : null); req.onerror = () => resolve(null); } catch (e) { resolve(null); } })); }
-            function idbSet(key, val) { return idbOpen().then(db => new Promise((resolve) => { try { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').put({ data: val }, key); tx.oncomplete = () => resolve(true); tx.onerror = () => resolve(false); } catch (e) { resolve(false); } })); }
-            const observer = new MutationObserver(async (mutations) => {
-                for (const mutation of mutations) {
-                    for (const node of mutation.addedNodes) {
-                        if (node.tagName === 'SCRIPT' && node.src && node.src.includes('/static/index-')) {
-                            node.remove(); observer.disconnect();
-                            let gameJS = null, patchedScript = null;
-                            try { const cached = await idbGet(GAME_CACHE_KEY); if (cached && cached.length > 1000) { try { const p = this.patchGameScript(cached); new Function(p); gameJS = cached; patchedScript = p; } catch (e) { console.warn('hvhm: cached game source invalid, refetching'); } } } catch (e) {}
-                            if (!patchedScript) {
-                                const sources = [
-                                    'https://hvhmkrunker.vercel.app/game_3_0.js',
-                                    'https://cdn.jsdelivr.net/gh/Quirify1/Krunker-Server-data@main/game_3_0.js',
-                                    'https://gitlab.com/levifrsn63-group/hvhmkrunker/-/raw/main/game_3_0.js',
-                                    'https://raw.githubusercontent.com/Quirify1/Krunker-Server-data/refs/heads/main/game_3_0.js'
-                                ];
-                                for (const src of sources) {
-                                    let js = null;
-                                    try { js = downloadFileSync(src); } catch (e) { js = null; }
-                                    if (!js || js.length <= 1000) continue;
-                                    let p = null;
-                                    try { p = this.patchGameScript(js); } catch (e) { console.error('hvhm: patch failed for ' + src + ': ' + e.message); continue; }
-                                    try { new Function(p); } catch (e) { console.error('hvhm: source failed to compile (' + src + '): ' + e.message); continue; }
-                                    gameJS = js; patchedScript = p; break;
-                                }
-                            }
-                            if (!patchedScript) { console.error('hvhm: Failed to load a working game source (offline / rate-limited / all corrupted).'); return; }
-                            this.gameJS = gameJS;
-                            try { const existing = await idbGet(GAME_CACHE_KEY); if (existing !== gameJS) idbSet(GAME_CACHE_KEY, gameJS); } catch (e) {}
-this.gameVersion = (function () { try { var a = /let\s+[^\s=]+\s*=\s*['"]([0-9]+\.[0-9]+\.[0-9]+)['"]\s*;\s*let\s+[^\s=]+\s*=\s*[^\s=]+\s*\+\s*['"][^'"]+['"]\s*;\s*let\s+[^\s=]+\s*=\s*process\.env\.CUSTOM_VERSION/s.exec(this.gameJS); if (a) return a[1]; } catch (e) {} var b = /["'](9\.[0-9]+\.[0-9]+)["']/.exec(this.gameJS); return b ? b[1] : '9.2.12'; }).call(this);
-                            const runScript = patchedScript;
-                            window.addEventListener('load', () => { try { Function(runScript)(); } catch (e) { console.error('hvhm: game execution error', e); } });
+            console.log("hvhm: Initializing Game Loader & Captcha Bypass...");
+            let tokenResolve;
+            const tokenPromise = new Promise((resolve) => (tokenResolve = resolve));
+            try {
+                const ifr = document.createElement('iframe');
+                ifr.src = location.origin + '/' + (window.location.search ? window.location.search : '');
+                ifr.style.display = 'none';
+                document.documentElement.append(ifr);
+                ifr.contentWindow.fetch = new Proxy(ifr.contentWindow.fetch, {
+                    apply(target, thisArg, [u, ...rest]) {
+                        if (typeof u === 'string' && u.includes('/seek-game')) {
+                            let v;
+                            try { v = JSON.parse(new URL(u, location.origin).searchParams.get('dataQuery'))?.v; } catch (e) {}
+                            try { ifr.remove(); } catch (e) {}
+                            tokenResolve({ u, v });
                             return;
                         }
+                        return Reflect.apply(target, thisArg, [u, ...rest]);
                     }
+                });
+            } catch (e) { console.warn('hvhm: iframe captcha token intercept error:', e); }
+            window.fetch = new Proxy(window.fetch, {
+                apply: async (target, thisArg, [u, ...rest]) => {
+                    if (typeof u === 'string' && u.includes('/seek-game')) {
+                        const tok = await tokenPromise.catch(() => ({}));
+                        if (tok && tok.v) {
+                            try {
+                                const url = new URL(u, location.origin);
+                                const q = JSON.parse(url.searchParams.get('dataQuery'));
+                                if (q) { q.v = tok.v; url.searchParams.set('dataQuery', JSON.stringify(q)); u = url.toString(); }
+                            } catch (e) { u = tok.u || u; }
+                        } else if (tok && tok.u) { u = tok.u; }
+                    }
+                    return Reflect.apply(target, thisArg, [u, ...rest]);
                 }
             });
-            observer.observe(document, { childList: true, subtree: true });
-        }
-
-        patchGameScript(script) {
-            const entries = {
-                isYou: { regex: /(?:this\.\w+\s*=\s*true;)\s*this\.(\w+)\s*=\s*[^;]+;(?:\s*this\.\w+\s*=\s*[^;]+;){5}\s*this\.\w+\s*=\s*null;/s, index: 1 },
-                pchObjc: { regex: /this\.([^\s=]+)\s*=\s*new\s+[^\s]+\.Object3D\(\)/u, index: 1 },
-                inView: { regex: /([^\s=.]+)\.([^\s=]+)\s*=\s*\([^;]+;\s*if\s*\(\1\.latestData\)/s, index: 2 },
-                procInputs: { regex: /for\s*\(\s*var\s+[^\s=]+\s*=\s*0;\s*[^\s<]+\s*<\s*this\.[^;]+;\s*\+\+[^\s)]+\s*\)\s*{\s*this\.([^\s(]+)\([^)]+\);\s*}\s*this\.[^\s(]+\(\);/s, index: 1 },
-                weaponIndex: { regex: /}\s*else\s*{\s*this\.[^\s=\[]+\[this\.([^\s=\]]+)\]\s*=\s*[^;]+;\s*}\s*[^.\s]+\.updatePlayerAmmo\(this\);/s, index: 1 },
-                //gameVersion: { regex: /(let\s+[^\s=]+\s*=\s*)['"][0-9]+\.[0-9]+\.[0-9]+['"](\s*;\s*let\s+[^\s=]+\s*=\s*[^\s=]+\s*\+\s*['"][^'"]+['"]\s*;\s*let\s+[^\s=]+\s*=\s*process\.env\.CUSTOM_VERSION)/s, patch: `$1"9.2.3"$2` },
-                fixHowler: { regex: /Howler\.orientation\([^;]+\);/g, patch: "/* Howler Orientation Removed By Anonimbiri */" },
-                anticheat1: { regex: /if\s*\(\s*window\.utilities\s*\)\s*\{[\s\S]*?\}/, patch: '/* Anticheat Removed By Anonimbiri */' },
-                commandline: { regex: /Object\.defineProperty\(console,\s*['_"]_commandLineAPI['_"][\s\S]*?}\);?/g, patch: "/* Antidebug removed by hvhm */" },
+            const downloadGame = async (url) => {
+                try {
+                    const req = new XMLHttpRequest();
+                    req.open('GET', url, false);
+                    req.send();
+                    if (req.status === 200 && req.response) return req.response;
+                } catch (e) {}
+                try {
+                    const res = await fetch(url);
+                    if (res.ok) return await res.text();
+                } catch (e) { console.error('hvhm: Network error fetching game script:', e); }
+                return null;
             };
-            for (const name in entries) {
-                const object = entries[name]; const found = object.regex.exec(script);
-                if (object.hasOwnProperty('index')) {
-                    if (!found) { console.warn(`hvhm: Failed to Find '${name}'`); this.vars[name] = null; }
-                    else { this.vars[name] = found[object.index]; console.log(`hvhm: Found '${name}': ${this.vars[name]}`); }
-                } else if (found) { script = script.replace(object.regex, object.patch); console.log(`hvhm: Patched '${name}'`); }
-                else { console.warn(`hvhm: Failed to Patch '${name}'`); }
+            const gameSources = () => {
+                const list = [];
+                try { const custom = localStorage.getItem('hvhm_game_source_url'); if (custom) list.push(custom); } catch (e) {}
+                list.push(
+                    'https://hvhm-game.vercel.app/game.js',
+                    'https://raw.githubusercontent.com/levifrsn63/krunker-loader/main/game.js',
+                    'https://cdn.jsdelivr.net/gh/levifrsn63/krunker-loader@main/game.js',
+                    'https://raw.githubusercontent.com/Quirify1/Krunker-Server-data/refs/heads/main/game_3_0.js?t=' + Date.now(),
+                    'https://cdn.jsdelivr.net/gh/Quirify1/Krunker-Server-data@main/game_3_0.js'
+                );
+                return list;
+            };
+            const injectGame = async () => {
+                if (window.__hvhmInjected) return;
+                window.__hvhmInjected = true;
+                console.log('hvhm: Downloading and patching game client...');
+                let gameJS = null;
+                let patchedScript = null;
+                for (const src of gameSources()) {
+                    try {
+                        const js = await downloadGame(src);
+                        if (!js || js.length <= 1000) continue;
+                        const verMatch = /(?:let|var)\s+[^\s=,]+\s*,\s*[^\s=,]+\s*,\s*[^\s=,]+\s*,\s*[^\s=,]+\s*=\s*['"]([0-9]+\.[0-9]+\.[0-9]+)['"]/s.exec(js) || /['"]([0-9]+\.[0-9]+\.[0-9]+)['"]\s*,\s*[^\s=,]+\s*=\s*[^\s=,]+\s*\+\s*['"]r1['"]/.exec(js);
+                        if (verMatch && !/^10\./.test(verMatch[1])) { console.warn('hvhm: stale client ' + verMatch[1] + ' — skipping ' + src); continue; }
+                        const p = this.patchGameScript(js);
+                        if (!p) { console.warn('hvhm: mirror source hooks missing — skipping ' + src); continue; }
+                        try { new Function(p); } catch (e) { console.warn('hvhm: mirror failed to compile — skipping ' + src); continue; }
+                        gameJS = js;
+                        patchedScript = p;
+                        break;
+                    } catch (e) { console.warn('hvhm: game source fetch failed for ' + src, e); }
+                }
+                if (!gameJS) { console.error('hvhm: FATAL - Failed to download game client'); return; }
+                try {
+                    const m = /(?:let|var)\s+[^\s=,]+\s*,\s*[^\s=,]+\s*,\s*[^\s=,]+\s*,\s*[^\s=,]+\s*=\s*['"]([0-9]+\.[0-9]+\.[0-9]+)['"]/s.exec(gameJS) || /['"]([0-9]+\.[0-9]+\.[0-9]+)['"]\s*,\s*[^\s=,]+\s*=\s*[^\s=,]+\s*\+\s*['"]r1['"]/.exec(gameJS) || /(?:let|var)\s+[^\s=]+\s*=\s*['"]([0-9]+\.[0-9]+\.[0-9]+)['"]\s*;\s*(?:let|var)\s+[^\s=]+\s*=\s*[^\s=]+\s*\+\s*['"][^'"]+['"]\s*;\s*(?:let|var)\s+[^\s=]+\s*=\s*process\.env\.CUSTOM_VERSION/s.exec(gameJS);
+                    if (m) this.gameVersion = m[1];
+                } catch (e) {}
+                this.gameJS = gameJS;
+                try {
+                    window.__hvhmGameSource = gameJS;
+                    const r = indexedDB.open('hvhm_gamecache', 1);
+                    r.onupgradeneeded = () => { const db = r.result; if (!db.objectStoreNames.contains('kv')) db.createObjectStore('kv'); };
+                    r.onsuccess = () => { try { r.result.transaction('kv', 'readwrite').objectStore('kv').put({ data: gameJS }, 'hvhm_live_capture'); } catch (e) {} };
+                } catch (e) {}
+                window.__xVb92__ = 'aB7k2m9Pq';
+                console.log('hvhm: Executing patched game client (' + this.gameVersion + ')...');
+                if (document.readyState === 'complete') Function(patchedScript)();
+                else window.addEventListener('load', () => { Function(patchedScript)(); });
+            };
+            const isGameScript = (src) => {
+                if (!src || typeof src !== 'string') return false;
+                return src.includes('/static/index-') || src.includes('/static/index.') || src.includes('/pkg/index') || src.includes('game.js') || src.includes('/js/game.');
+            };
+            let obs = null;
+            const onScriptNode = (node) => {
+                if (node && node.tagName === 'SCRIPT' && isGameScript(node.src)) {
+                    console.log('hvhm: Intercepted official script:', node.src);
+                    node.remove();
+                    if (obs) obs.disconnect();
+                    injectGame();
+                    return true;
+                }
+                return false;
+            };
+            let preHit = false;
+            try {
+                const existing = document.querySelectorAll('script[src]');
+                for (const node of existing) {
+                    if (onScriptNode(node)) { preHit = true; break; }
+                }
+            } catch (e) {}
+            if (!preHit) {
+                obs = new MutationObserver((muts) => {
+                    for (const m of muts) {
+                        for (const n of m.addedNodes) {
+                            if (onScriptNode(n)) return;
+                        }
+                    }
+                });
+                obs.observe(document, { childList: true, subtree: true });
             }
-            return script;
         }
 
+    patchGameScript(script) {
+      script = script.replace(/Object\.defineProperty\s*\(\s*navigator\s*,\s*["']webdriver["']\s*,[\s\S]*?\}\);?/g, "/* webdriver defineProperty bypass */");
+      script = script.replace(/writable\s*:\s*false/g, "writable: true");
+      script = script.replace(/configurable\s*:\s*false/g, "configurable: true");
+      script = script.replace(/_dispatchEvent:\s*function\s*\(([^\s,)]+),\s*([^\s,)]+)\)\s*\{/u, "_dispatchEvent: function ($1, $2) { try { if (window.quirifyInstance) window.quirifyInstance.onNetDispatch(this, $1, $2); } catch(e){} ");
+      let _0x2480d3 = /(send:\s*function\s*\([^\s,)]+\)\s*\{[\s\n]*if\s*\(typeof\s+window\s*==\s*["']undefined["'][\s\S]*?arguments\[[^\s\]]+\];\s*\})/u;
+      script = script.replace(_0x2480d3, "$1 try { if (window.quirifyInstance) window.quirifyInstance.onNetSend(this, arguments[0], Array.prototype.slice.call(arguments, 1)); } catch(e){} ");
+      let _0x5c1ce7 = /(var\s+([^\s=]+)\s*=\s*([^\s=]+)\[([^\s=]+)\]\s*==\s*([^\s=]+)\.socketId;[\s\n]*\([^\s=]+\s*=\s*[^\s=.]+\.players\.add\()/u;
+      script = script.replace(_0x5c1ce7, (_0x1cb2eb, _0x396aa8, _0x80aa26, _0x43632a, _0x43b963, _0x580ca5) => {
+        return "var " + _0x80aa26 + " = " + _0x43632a + "[" + _0x43b963 + "] == " + _0x580ca5 + ".socketId;\ntry {\n    var _q = window.quirifyInstance;\n    var _isYou = " + _0x80aa26 + " || (_q && _q.me && " + _0x43632a + "[" + _0x43b963 + " + 5] === _q.me.name);\n    if (_isYou && _q && _q.settings && _q.settings.unlockSkins) {\n        var _sc = _q.getEffectiveSkinCache ? _q.getEffectiveSkinCache() : _q.skinCache;\n        if (_sc) {\n            if (_sc.main !== undefined && _sc.main !== -1) {\n                " + _0x43632a + "[" + _0x43b963 + " + 12] = [_sc.main, (_sc.secondary !== undefined && _sc.secondary !== -1) ? _sc.secondary : -1];\n            }\n            if (_sc.hat !== undefined && _sc.hat !== -1) " + _0x43632a + "[" + _0x43b963 + " + 13] = _sc.hat;\n            if (_sc.body !== undefined && _sc.body !== -1) " + _0x43632a + "[" + _0x43b963 + " + 14] = _sc.body;\n            if (_sc.knife !== undefined && _sc.knife !== -1) " + _0x43632a + "[" + _0x43b963 + " + 19] = _sc.knife;\n            if (_sc.dye !== undefined && _sc.dye !== -1) " + _0x43632a + "[" + _0x43b963 + " + 24] = _sc.dye;\n            if (_sc.waist !== undefined && _sc.waist !== -1) " + _0x43632a + "[" + _0x43b963 + " + 30] = _sc.waist;\n            if (_sc.back !== undefined && _sc.back !== -1) " + _0x43632a + "[" + _0x43b963 + " + 41] = _sc.back;\n            if (_sc.playerCard !== undefined && _sc.playerCard !== -1) " + _0x43632a + "[" + _0x43b963 + " + 43] = _sc.playerCard;\n        }\n    }\n} catch(e) {}\n" + _0x1cb2eb.substring(_0x1cb2eb.indexOf("("));
+      });
+      let _0x17b5e0 = /(\.skins\s*=\s*)([^\s=]+)(\s*\|\|\s*\[-1,\s*-1\]);/u;
+      script = script.replace(_0x17b5e0, "$1 ((window.quirifyInstance && window.quirifyInstance.settings && window.quirifyInstance.settings.unlockSkins && window.quirifyInstance.getSkinForPlayer) ? window.quirifyInstance.getSkinForPlayer(this, $2) : ($2 $3));");
+      let _0x49f5ed = /(\.meleeIndex\s*=\s*)([^\s=;]+);/u;
+      script = script.replace(_0x49f5ed, "$1 ((this.isYou && window.quirifyInstance && window.quirifyInstance.settings && window.quirifyInstance.settings.unlockSkins && window.quirifyInstance.getMeleeForPlayer) ? window.quirifyInstance.getMeleeForPlayer(this, $2) : $2);");
+      let _0x2c09f3 = null;
+      let _0x5c29a1 = 0;
+      while ((_0x5c29a1 = script.indexOf(".latestData", _0x5c29a1)) !== -1) {
+        const _0x2da5a7 = script.substring(Math.max(0, _0x5c29a1 - 300), _0x5c29a1 + 15);
+        const _0x5404ec = /\.([a-zA-Z0-9_$]+)\s*=\s*\([^;]+;\s*if\s*\([a-zA-Z0-9_$]+\.latestData/.exec(_0x2da5a7) || /([^\s=.]+)\.([^\s=]+)\s*=\s*\([^;]+;\s*if\s*\(\1\.latestData\)/.exec(_0x2da5a7);
+        if (_0x5404ec) {
+          _0x2c09f3 = _0x5404ec[2] || _0x5404ec[1];
+          break;
+        }
+        _0x5c29a1 += 11;
+      }
+      this.vars.inView = _0x2c09f3 || "cnSeen";
+      const _0xb14b6d = /(?:this\.active\s*=\s*true;)\s*this\.(\w+)\s*=\s*[^;]+;(?:\s*this\.\w+\s*=\s*[^;]+;){5}\s*this\.\w+\s*=\s*null;/s.exec(script);
+      this.vars.isYou = _0xb14b6d ? _0xb14b6d[1] : "isYou";
+      const _0x45484c = /this\.([^\s=]+)\s*=\s*new\s+[^\s]+\.Object3D\(\)/u.exec(script) || /['"]pchObjc['"]/.exec(script);
+      this.vars.pchObjc = _0x45484c ? _0x45484c[1] || "pchObjc" : "pchObjc";
+      const _0x3870aa = /this\[['"]([a-zA-Z0-9_$]+)['"]\]\s*\(\s*this\[['"]inputs['"]\]/.exec(script) || /for\s*\(\s*var\s+[^\s=]+\s*=\s*0;\s*[^\s<]+\s*<\s*this\.inputs\.length;\s*\+\+[^\s)]+\s*\)\s*\{[^}]*this\.([^\s(]+)\(/s.exec(script);
+      this.vars.procInputs = _0x3870aa ? _0x3870aa[1] || _0x3870aa[2] : "procInputs";
+      const _0x5b1bb7 = /this\[['"]ammos['"]\]\[this\[['"]([a-zA-Z0-9_$]+)['"]\]\]/.exec(script) || /this\[['"]ammos['"]\]\[this\.([a-zA-Z0-9_$]+)\]/.exec(script) || /\}\s*else\s*\{\s*this\.[^\s=\[]+\[this\.([^\s=\]]+)\]\s*=\s*[^;]+;\s*\}\s*[^.\s]+\.updatePlayerAmmo\(this\);/s.exec(script);
+      this.vars.weaponIndex = _0x5b1bb7 ? _0x5b1bb7[1] : "loadoutIndex";
+      console.log("👑 hvhm: Fast Variable Hook Extracted:", this.vars);
+      return script;
+    }
         initializeGameHooks() {
             const cheatInstance = this;
             const originalSkinsSymbol = Symbol('origSkins');
@@ -624,11 +796,26 @@ this.gameVersion = (function () { try { var a = /let\s+[^\s=]+\s*=\s*['"]([0-9]+
                     },
                     get() { return this['_events']; },
                 },
-                premiumT: { set(value) { return value; }, get() { return cheatInstance.settings.unlockSkins; } },
+                premiumT: { set(value) { return value; }, get() { return cheatInstance.settings.unlockSkins || cheatInstance.settings.unlockPremium; } },
                 idleTimer: { enumerable: false, get() { return cheatInstance.settings.antikick ? 0 : this['_idleTimer']; }, set(value) { this['_idleTimer'] = value; } },
                 kickTimer: { enumerable: false, get() { return cheatInstance.settings.antikick ? Infinity : this['_kickTimer']; }, set(value) { this['_kickTimer'] = value; } },
-                cnBSeen: { set(value) { this.inView = value; }, get() { const isEnemy = !this.team || (cheatInstance.me && this.team !== cheatInstance.me.team); return isEnemy && (cheatInstance.settings.espBoxMode !== 'off' || cheatInstance.settings.espNameTags) ? false : this.inView; } },
-                canBSeen: { set(value) { this.inViewBot = value; }, get() { const isEnemy = !this.team || (cheatInstance.me && this.team !== cheatInstance.me.team); return isEnemy && (cheatInstance.settings.espBoxMode !== 'off' || cheatInstance.settings.espNameTags) ? false : this.inViewBot; } },
+                cnSeen: {
+                    set(value) { this._hvhmCnSeen = value; },
+                    get() {
+                        const isEnemy = !this.team || (cheatInstance.me && this.team !== cheatInstance.me.team);
+                        const base = this._hvhmCnSeen !== undefined ? this._hvhmCnSeen : false;
+                        return isEnemy && (cheatInstance.settings.espBoxMode !== 'off' || cheatInstance.settings.espSquare || cheatInstance.settings.espNameTags) ? false : base;
+                    }
+                },
+                cnBSeen: { set(value) { this.cnSeen = value; }, get() { return this.cnSeen; } },
+                canBSeen: {
+                    set(value) { this._hvhmCanBSeen = value; },
+                    get() {
+                        const isEnemy = !this.team || (cheatInstance.me && this.team !== cheatInstance.me.team);
+                        const base = this._hvhmCanBSeen !== undefined ? this._hvhmCanBSeen : false;
+                        return isEnemy && (cheatInstance.settings.espBoxMode !== 'off' || cheatInstance.settings.espSquare || cheatInstance.settings.espNameTags) ? false : base;
+                    }
+                },
                 thirdPerson: { set(value) { this['_thirdPerson'] = value; }, get() { return cheatInstance.settings.thirdPersonEnabled ? true : (this['_thirdPerson'] !== undefined ? this['_thirdPerson'] : false); } },
                 trail: { set(value) { this['_trail'] = value; }, get() { return cheatInstance.settings.alwaysTrail ? true : this['_trail']; } },
             });
@@ -644,12 +831,28 @@ this.gameVersion = (function () { try { var a = /let\s+[^\s=]+\s*=\s*['"]([0-9]+
             this.update3DESP();
             this.applyRage();
             this.updateHvhmDetection(performance.now());
+            if (this.settings.weaponZoom !== 1 && this.me.aimVal < 1) {
+                if (this.renderer.camera) this.renderer.camera.zoom = this.settings.weaponZoom;
+            } else if (this.renderer.camera && this.renderer.camera.zoom !== 1) {
+                this.renderer.camera.zoom = 1;
+            }
+            // Browser userscripts cannot reliably detect every OS-level
+            // capture API. This manual mode suppresses all custom overlay
+            // drawing while leaving the game render untouched.
+            if (this.settings.captureSafeOverlay) return;
             if (this.me.procInputs && !this.me.procInputs[this.isProxy]) {
                 const originalProcInputs = this.me.procInputs;
-                const _origProc = originalProcInputs;
                 const self = this;
-                this.me.procInputs = function () { if (this) { self.onProcessInputs(arguments[0], this); } return _origProc.apply(this, arguments); };
-                try { this.me.procInputs[self.isProxy] = true; } catch (e) {}
+                this.me.procInputs = new Proxy(originalProcInputs, {
+                    apply(target, thisArg, args) {
+                        if (thisArg) self.onProcessInputs(args[0], thisArg);
+                        return Reflect.apply(target, thisArg, args);
+                    },
+                    get(target, prop) {
+                        if (prop === self.isProxy) return true;
+                        return Reflect.get(target, prop);
+                    }
+                });
             }
 
             if (this.lastWireframeState !== this.settings.wireframeEnabled) {
@@ -682,6 +885,7 @@ this.gameVersion = (function () { try { var a = /let\s+[^\s=]+\s*=\s*['"]([0-9]+
                     }
                     this.drawCanvasESP(player, false, false);
                     this.drawHvhmUserTag(player);
+                    try { this.drawCheaterTag(player); } catch (e) {}
                 }
             }
             if (this.settings.espBotCheck && this.game?.AI?.ais) { for (const bot of this.game.AI.ais) { if (!bot.mesh || !bot.mesh.visible || bot.health <= 0) continue; this.drawCanvasESP(bot, true); } }
@@ -1008,7 +1212,13 @@ this.gameVersion = (function () { try { var a = /let\s+[^\s=]+\s*=\s*['"]([0-9]+
             this._setChamsDistanceCulling(enabled);
             if (enabled) {
                 const { entities, local } = this.getPlayerEntities();
-                for (const entity of entities) { if (entity) { current.add(entity); this._forceChamsEntityRenderable(entity); this._applyChamsToEntity(entity, false, s); } }
+                const teammateEntities = new Set(((this.game && this.game.players && this.game.players.list) || [])
+                    .filter(p => p && !p.isYou && this.isTeam(p))
+                    .map(p => p.objInstances || p.mesh).filter(Boolean));
+                for (const entity of entities) {
+                    if (!entity || (!s.chamsTeammates && teammateEntities.has(entity))) continue;
+                    current.add(entity); this._forceChamsEntityRenderable(entity); this._applyChamsToEntity(entity, false, s);
+                }
                 if (s.chamsSelf && local && this.isThirdPersonView()) {
                     current.add(local);
                     this._applyChamsToEntity(local, true, s);
@@ -1152,31 +1362,12 @@ this.gameVersion = (function () { try { var a = /let\s+[^\s=]+\s*=\s*['"]([0-9]+
             this._updateChamsMaterials(entity, s, isLocal);
         }
 
-        isSniperADS() {
-            const weapon = this.me && this.me.weapon;
-            if (!weapon || !(Number(this.me.aimVal) > 0.001 || this.me.isAiming || this.me.scoped || this.me.scope)) return false;
-            const name = String(weapon.name || weapon.n || weapon.label || '').toLowerCase();
-            const zoom = Number(weapon.zoom);
-            // Weapon tables are not consistent about exposing a sniper flag;
-            // high native zoom is the reliable fallback for scoped rifles.
-            return Boolean(weapon.sniper || weapon.sniperFlap || /sniper|awp|scout|ssg/.test(name) || (Number.isFinite(zoom) && zoom >= 2.0));
-        }
-
         updateFOV() {
             const scene = this.renderer && this.renderer.scene;
             const value = Number(this.settings.fovChanger);
             if (!scene) return;
 
             if (!Number.isFinite(value) || value <= 0) {
-                for (const [camera, state] of this._fovCameraLocks) this._unlockFOVCamera(camera, state);
-                this._fovCameraLocks.clear();
-                return;
-            }
-
-            // Do not override a sniper's native ADS projection. The game owns
-            // that zoom while scoped; the selected FOV returns immediately when
-            // the scope is released.
-            if (this.isSniperADS()) {
                 for (const [camera, state] of this._fovCameraLocks) this._unlockFOVCamera(camera, state);
                 this._fovCameraLocks.clear();
                 return;
@@ -1359,7 +1550,7 @@ this.gameVersion = (function () { try { var a = /let\s+[^\s=]+\s*=\s*['"]([0-9]+
                 }
             }
             if (this.settings.autoNuke && Object.keys(this.me.streaks).length && this.socket?.send) { this.socket.send('k', 0); }
-            if (this.settings.autoReload && this.me.weapon.secondary !== undefined && this.me.weapon.secondary !== null && this.me.ammos[this.me[this.vars.weaponIndex]] === 0 && this.me.reloadTimer === 0) {
+            if (this.settings.autoReload && this.vars.weaponIndex && this.me.weapon.secondary !== undefined && this.me.weapon.secondary !== null && this.me.ammos[this.me[this.vars.weaponIndex]] === 0 && this.me.reloadTimer === 0) {
                 this.game.players.reload(this.me); inputPacket[gameInputIndices.reload] = 1;
             }
 
@@ -1436,7 +1627,7 @@ this.gameVersion = (function () { try { var a = /let\s+[^\s=]+\s*=\s*['"]([0-9]+
                     // Keep the original smooth target interpolation for both
                     // visible and silent aim. Silent aim only suppresses camera
                     // movement; it must not turn aiming into an inaccurate snap.
-                    if (this.settings.legitAimbot) {
+                    if (this.settings.legitAimbot && (!target.isBot || this.settings.legitAiAim)) {
                         let adsReduction = 1.0; if (this.me.aimVal < 1) { adsReduction = 1.0 - (this.settings.adsTremorReduction / 100.0); }
 
                         if (this.legitTarget !== target) {
@@ -1453,7 +1644,8 @@ this.gameVersion = (function () { try { var a = /let\s+[^\s=]+\s*=\s*['"]([0-9]+
                         this.aimOffset.y = Math.max(-wanderAmount, Math.min(wanderAmount, this.aimOffset.y));
 
                         const currentY = this.controls.object.rotation.y;
-                        const currentX = this.controls[this.vars.pchObjc].rotation.x;
+                        const __pch = this.vars.pchObjc && this.controls[this.vars.pchObjc];
+                        const currentX = __pch ? __pch.rotation.x : 0;
 
                         const finalX = xDire + this.aimOffset.y * 0.01;
                         const finalY = yDire + this.aimOffset.x * 0.01;
@@ -1482,17 +1674,20 @@ this.gameVersion = (function () { try { var a = /let\s+[^\s=]+\s*=\s*['"]([0-9]+
                     if (this.settings.autoFireEnabled) {
                         this.playerMaps.length = 0; this.rayC.setFromCamera(this.vec2, this.renderer.fpsCamera);
                         this.playerMaps = this.game.players.list.map(p => p.objInstances).filter(Boolean);
-                        let inCast = this.rayC.intersectObjects(this.playerMaps, true).length;
-                        let canSee = target.objInstances && this.containsPoint(target.objInstances.position);
-                        if (isMelee) {
-                            if (distance <= closeRange && this.me.reloadTimer === 0 && !this.me.didShoot && this.me.aimVal === 0 && (!this.settings.legitAimbot || (inCast && canSee))) { inputPacket[gameInputIndices.shoot] = 1; }
-                            else if (distance <= throwRange && this.me.weapon.canThrow) {
-                                inputPacket[gameInputIndices.scope] = 1;
-                                if(this.me.aimVal === 0 && this.me.reloadTimer === 0 && !this.me.didShoot && (!this.settings.legitAimbot || (inCast && canSee))){ inputPacket[gameInputIndices.shoot] = 1; }
+                        const inCast = this.rayC.intersectObjects(this.playerMaps, true).length;
+                        const canSee = target.objInstances && this.containsPoint(target.objInstances.position);
+                        const confirmed = !this.settings.legitAimbot || (inCast && canSee);
+                        if (this.me.reloadTimer === 0 && !this.me.didShoot && confirmed) {
+                            if (isMelee) {
+                                if (distance <= closeRange) { inputPacket[gameInputIndices.shoot] = 1; }
+                                else if (distance <= throwRange && this.me.weapon.canThrow) {
+                                    inputPacket[gameInputIndices.scope] = 1;
+                                    inputPacket[gameInputIndices.shoot] = 1;
+                                }
+                            } else {
+                                if (!this.me.weapon.noAim) inputPacket[gameInputIndices.scope] = 1;
+                                inputPacket[gameInputIndices.shoot] = 1;
                             }
-                        } else {
-                            if (!this.me.weapon.noAim) inputPacket[gameInputIndices.scope] = 1;
-                            if ((this.me.weapon.noAim || this.me.aimVal === 0) && this.me.reloadTimer === 0 && !this.me.didShoot && (!this.settings.legitAimbot || (inCast && canSee))) { inputPacket[gameInputIndices.shoot] = 1; }
                         }
                     }
                 }
@@ -1511,6 +1706,7 @@ this.gameVersion = (function () { try { var a = /let\s+[^\s=]+\s*=\s*['"]([0-9]+
                 inputPacket[gameInputIndices.shoot] = 0; inputPacket[gameInputIndices.scope] = 0;
                 this.me.inspecting = false; this.me.inspectX = 0;
             }
+
         }
 
         applyAntiAim(inputPacket, idx) {
@@ -1578,87 +1774,718 @@ this.gameVersion = (function () { try { var a = /let\s+[^\s=]+\s*=\s*['"]([0-9]+
             return candidates.length ? candidates[0].p : null;
         }
 
+        getLobbyId() {
+            try {
+                const params = new URLSearchParams(window.location.search);
+                return params.get('game') || null;
+            } catch (e) { return null; }
+        }
+
+        startLobbyHeartbeat() {
+            if (this.lobbyHeartbeatInterval) clearInterval(this.lobbyHeartbeatInterval);
+            if (this.lobbyFetchInterval) clearInterval(this.lobbyFetchInterval);
+            let firstBeatDone = false;
+            const beat = async () => {
+                if (!this.settings.showCheaterRadar || this.settings.hideFromRadar) return;
+                const lobbyId = this.getLobbyId();
+                if (!lobbyId) return;
+                const playerName = this.me && this.me.name ? this.me.name : null;
+                if (!playerName) return;
+                try {
+                    const res = await fetch('https://krunker.twitchfollows.de/api/lobby/heartbeat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            key: this.scriptId,
+                            sessionId: localStorage.getItem('hvhm_sid'),
+                            username: playerName,
+                            lobbyId,
+                            teamMode: this.settings.teamWithCheaters
+                        })
+                    });
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    const data = await res.json().catch(() => ({}));
+                    if (data.role) {
+                        this.myRole = data.role;
+                        this.lobbyCheatUsers.set(playerName, {
+                            teamMode: !!this.settings.teamWithCheaters,
+                            role: this.myRole
+                        });
+                    }
+                    this.heartbeatFailCount = 0;
+                    firstBeatDone = true;
+                } catch (e) { console.warn('hvhm: lobby heartbeat notice:', e.message || e); }
+            };
+            this.sendLobbyHeartbeat = beat;
+            const fetchUsers = () => {
+                const id = this.getLobbyId();
+                if (id && this.settings.showCheaterRadar) this.fetchLobbyUsers(id);
+            };
+            beat();
+            fetchUsers();
+            this.lobbyHeartbeatInterval = setInterval(beat, 15000);
+            this.lobbyFetchInterval = setInterval(fetchUsers, 10000);
+            let lastHref = window.location.href;
+            setInterval(() => {
+                const changed = window.location.href !== lastHref;
+                const hasName = !!this.me && !!this.me.name;
+                if (changed) {
+                    lastHref = window.location.href;
+                    this.lobbyCheatUsers.clear();
+                    firstBeatDone = false;
+                    beat();
+                    fetchUsers();
+                } else if (!firstBeatDone && hasName) {
+                    firstBeatDone = true;
+                    beat();
+                }
+            }, 1500);
+        }
+
+        async fetchLobbyUsers(lobbyId) {
+            if (!lobbyId) return;
+            try {
+                const res = await fetch('https://krunker.twitchfollows.de/api/lobby/users?lobbyId=' + encodeURIComponent(lobbyId));
+                if (!res.ok) return;
+                const data = await res.json();
+                const next = new Map((data.users || []).map(u => [u.name, {
+                    teamMode: u.teamMode,
+                    role: u.role || 'user'
+                }]));
+                const myName = this.me?.name;
+                next.forEach((entry, name) => {
+                    if (name === myName) return;
+                    const prev = this.lobbyCheatUsers.get(name);
+                    const wasStaff = prev && (prev.role === 'owner' || prev.role === 'moderator');
+                    if (!wasStaff && (entry.role === 'owner' || entry.role === 'moderator')) {
+                        const isOwner = entry.role === 'owner';
+                        this.notify({
+                            title: isOwner ? 'Owner in Lobby' : 'Moderator in Lobby',
+                            message: name + ' (' + (isOwner ? 'Owner' : 'Moderator') + ') is now in your game.',
+                            timeout: 8000
+                        });
+                    }
+                });
+                this.lobbyCheatUsers = next;
+            } catch (e) {}
+        }
+
+        async fetchFeatureStatuses() {
+            const now = Date.now();
+            if (now - this.featureStatusLastFetch < 300000) return;
+            this.featureStatusLastFetch = now;
+            try {
+                const res = await fetch('https://krunker.twitchfollows.de/api/feature-status');
+                if (!res.ok) return;
+                const list = await res.json();
+                this.featureStatuses = {};
+                for (const f of list) {
+                    this.featureStatuses[f.feature_id] = f;
+                    if (f.force_disabled === 1) this.settings[f.feature_id] = false;
+                }
+                this.saveSettings('hvhm_settings', this.settings);
+            } catch (e) {}
+        }
+
+        isTeamingFriendly() {
+            const now = Date.now();
+            const on = !!this.settings.teamWithCheaters;
+            if (on !== this._lastTeamWithCheatersState) {
+                this._lastTeamWithCheatersState = on;
+                if (on) this._teamWithCheatersToggledOnTime = now;
+                else this._teamWithCheatersLastEnabled = now;
+                if (typeof this.sendLobbyHeartbeat === 'function') this.sendLobbyHeartbeat();
+            }
+            if (on) return now - (this._teamWithCheatersToggledOnTime || 0) >= 5000;
+            return now - (this._teamWithCheatersLastEnabled || 0) < 10000;
+        }
+
+        onNetSend(socket, type, args) {
+            if (!this.settings.unlockSkins) return;
+            this.socket = socket;
+            const data = args[0];
+            if (type === 'en' && Array.isArray(data)) {
+                this.skinCache = {
+                    main: data[2] && data[2][0] !== undefined ? data[2][0] : -1,
+                    secondary: data[2] && data[2][1] !== undefined ? data[2][1] : -1,
+                    hat: data[3],
+                    body: data[4],
+                    knife: data[9],
+                    dye: data[14],
+                    waist: data[17] !== undefined ? data[17] : data[15],
+                    back: data[16],
+                    playerCard: data[32]
+                };
+            }
+            if (type === 'spry' && data && data !== 4577) {
+                if (!this.skinCache) this.skinCache = {};
+                this.skinCache.spray = data;
+                args[0] = 4577;
+            }
+        }
+
+        onNetDispatch(socket, eventName, eventData) {
+            this.socket = socket;
+            if (eventName === 'error' && eventData[0] && typeof eventData[0][0] === 'string' && eventData[0][0].includes('Connection Banned')) {
+                localStorage.removeItem('krunker_token');
+                this.notify({ title: 'Banned', message: 'Due to a ban, you have been signed out.\nPlease connect to the game with a VPN.', timeout: 5000 });
+            }
+            if (!this.settings.unlockSkins) return;
+            if (eventName === '0' && eventData[0]) {
+                try {
+                    const arr = eventData[0];
+                    const socketId = socket ? socket.socketId : 0;
+                    let stride = arr.length % 52 === 0 ? 52 : arr.length % 51 === 0 ? 51 : 38;
+                    while (arr.length % stride !== 0 && stride < 100) stride++;
+                    const cache = this.getEffectiveSkinCache();
+                    for (let k = 0; k < arr.length; k += stride) {
+                        const isLocal = (socketId !== undefined && socketId !== -1 && arr[k] === socketId) || (this.me && arr[k + 5] === this.me.name) || arr.length === stride;
+                        if (isLocal && cache) {
+                            if (cache.main !== -1) arr[k + 12] = [cache.main, cache.secondary !== -1 ? cache.secondary : -1];
+                            if (cache.hat !== -1) arr[k + 13] = cache.hat;
+                            if (cache.body !== -1) arr[k + 14] = cache.body;
+                            if (cache.knife !== -1) arr[k + 19] = cache.knife;
+                            if (cache.dye !== -1) arr[k + 24] = cache.dye;
+                            if (cache.waist !== -1) arr[k + 30] = cache.waist;
+                            if (cache.back !== -1) arr[k + 41] = cache.back;
+                            if (cache.playerCard !== -1) arr[k + 43] = cache.playerCard;
+                        }
+                    }
+                } catch (e) { console.error('hvhm: spawn injection error', e); }
+            }
+            if (eventName === 'sp' && eventData[0] && this.skinCache && this.skinCache.spray !== undefined) {
+                eventData[0][1] = this.skinCache.spray;
+            }
+            if (eventName === 'rg' && eventData[0] && Array.isArray(eventData[0][2])) {
+                try {
+                    const rg = eventData[0][2];
+                    const cache = this.getEffectiveSkinCache();
+                    if (cache) {
+                        if (cache.main !== -1) rg[0] = [cache.main, cache.secondary !== -1 ? cache.secondary : -1];
+                        if (cache.hat !== -1) rg[3] = cache.hat;
+                        if (cache.body !== -1) rg[5] = cache.body;
+                        if (cache.waist !== -1) rg[7] = cache.waist;
+                        if (cache.knife !== -1) rg[8] = cache.knife;
+                        if (cache.dye !== -1) rg[11] = cache.dye;
+                        if (cache.playerCard !== -1) rg[18] = cache.playerCard;
+                    }
+                } catch (e) {}
+            }
+        }
+
+        getEquippedSkinCache() {
+            let saved = {};
+            try {
+                const raw = localStorage.getItem('skins');
+                if (raw) saved = JSON.parse(raw);
+            } catch (e) {}
+            const cls = parseInt(localStorage.getItem('classindex') || '0', 10);
+            const sec = parseInt(localStorage.getItem('secondaryInd') || '2', 10);
+            const num = (key, fb) => {
+                const v = parseInt(localStorage.getItem(key) ?? '', 10);
+                return Number.isFinite(v) ? v : fb;
+            };
+            return {
+                main: saved[cls] !== undefined ? parseInt(saved[cls], 10) : -1,
+                secondary: saved[sec] !== undefined ? parseInt(saved[sec], 10) : -1,
+                knife: num('meleeIndex', -1),
+                hat: num('hatIndex', -1),
+                body: num('bodyIndex', -1),
+                dye: num('dyeIndex', -1),
+                waist: num('waistIndex', -1),
+                back: num('backIndex', -1),
+                playerCard: num('playerCardIndex', -1)
+            };
+        }
+
+        getEffectiveSkinCache() {
+            const equipped = this.getEquippedSkinCache();
+            if (!this.skinCache) this.skinCache = {};
+            const pick = (key) => (this.skinCache[key] !== undefined && this.skinCache[key] !== -1) ? this.skinCache[key] : equipped[key];
+            return {
+                main: pick('main'),
+                secondary: pick('secondary'),
+                knife: pick('knife'),
+                hat: pick('hat'),
+                body: pick('body'),
+                dye: pick('dye'),
+                waist: pick('waist'),
+                back: pick('back'),
+                playerCard: pick('playerCard')
+            };
+        }
+
+        getSkinForPlayer(player, origSkins) {
+            const cache = this.getEffectiveSkinCache();
+            if (cache && (cache.main !== -1 || cache.secondary !== -1)) {
+                return [cache.main !== -1 ? cache.main : (origSkins ? origSkins[0] : -1), cache.secondary !== -1 ? cache.secondary : (origSkins ? origSkins[1] : -1)];
+            }
+            return origSkins || [-1, -1];
+        }
+
+        getMeleeForPlayer(player, origMelee) {
+            const cache = this.getEffectiveSkinCache();
+            if (cache && cache.knife !== -1) return cache.knife;
+            return origMelee;
+        }
+
+        getHatForPlayer(player, orig) {
+            const cache = this.getEffectiveSkinCache();
+            if (cache && cache.hat !== -1) return cache.hat;
+            return orig;
+        }
+
+        getBodyForPlayer(player, orig) {
+            const cache = this.getEffectiveSkinCache();
+            if (cache && cache.body !== -1) return cache.body;
+            return orig;
+        }
+
+        getDyeForPlayer(player, orig) {
+            const cache = this.getEffectiveSkinCache();
+            if (cache && cache.dye !== -1) return cache.dye;
+            return orig;
+        }
+
+        getWaistForPlayer(player, orig) {
+            const cache = this.getEffectiveSkinCache();
+            if (cache && cache.waist !== -1) return cache.waist;
+            return orig;
+        }
+
+        applyPreset(preset) {
+            switch (preset) {
+                case 'blatant':
+                    this.settings.aimbotEnabled = true;
+                    this.settings.autoFireEnabled = true;
+                    this.settings.superSilentEnabled = true;
+                    this.settings.aimbotWallCheck = true;
+                    this.settings.aimbotWallBangs = true;
+                    this.settings.aimbotTeamCheck = true;
+                    this.settings.aimbotBotCheck = true;
+                    this.settings.legitAimbot = false;
+                    this.settings.legitAiAim = false;
+                    this.settings.flickSpeed = 0;
+                    this.settings.adsTremorReduction = 0;
+                    this.settings.aimRandomness = 0;
+                    this.settings.aimTremor = 0;
+                    this.settings.fovSize = 0;
+                    this.settings.drawFovCircle = false;
+                    break;
+                case 'legit':
+                    this.settings.aimbotEnabled = true;
+                    this.settings.superSilentEnabled = false;
+                    this.settings.autoFireEnabled = false;
+                    this.settings.aimbotWallCheck = true;
+                    this.settings.aimbotWallBangs = true;
+                    this.settings.aimbotTeamCheck = true;
+                    this.settings.aimbotBotCheck = true;
+                    this.settings.legitAimbot = true;
+                    this.settings.legitAiAim = false;
+                    this.settings.flickSpeed = 5;
+                    this.settings.adsTremorReduction = 50;
+                    this.settings.aimRandomness = 1.5;
+                    this.settings.aimTremor = 0;
+                    this.settings.aimTarget = 'head';
+                    this.settings.fovSize = 300;
+                    this.settings.drawFovCircle = true;
+                    break;
+                case 'legitai':
+                    this.settings.aimbotEnabled = true;
+                    this.settings.superSilentEnabled = false;
+                    this.settings.autoFireEnabled = false;
+                    this.settings.aimbotWallCheck = true;
+                    this.settings.aimbotWallBangs = true;
+                    this.settings.aimbotTeamCheck = true;
+                    this.settings.aimbotBotCheck = true;
+                    this.settings.legitAimbot = true;
+                    this.settings.legitAiAim = true;
+                    this.settings.flickSpeed = 5;
+                    this.settings.adsTremorReduction = 50;
+                    this.settings.aimRandomness = 1.5;
+                    this.settings.aimTremor = 0;
+                    this.settings.aimTarget = 'head';
+                    this.settings.fovSize = 300;
+                    this.settings.drawFovCircle = true;
+                    break;
+                case 'off':
+                    Object.assign(this.settings, this.defaultSettings);
+                    break;
+                default:
+                    return;
+            }
+            this.saveSettings('hvhm_settings', this.settings);
+            const menu = document.querySelector('.hvhm-menu-container');
+            if (menu) {
+                const toggleUI = (key) => {
+                    const item = menu.querySelector(`.hvhm-menu-item[data-setting="${key}"]`);
+                    if (item) {
+                        item.classList.toggle('active', !!this.settings[key]);
+                        const sw = item.querySelector('.hvhm-toggle-switch');
+                        if (sw) sw.classList.toggle('active', !!this.settings[key]);
+                    }
+                };
+                const sliderUI = (key) => {
+                    const sl = menu.querySelector(`.hvhm-slider[data-setting="${key}"]`);
+                    const sv = menu.querySelector(`.hvhm-slider-value[data-setting="${key}"]`);
+                    if (sl) sl.value = this.settings[key];
+                    if (sv) sv.value = this.settings[key] <= 0 ? 'Off' : this.settings[key];
+                };
+                ['aimbotEnabled', 'autoFireEnabled', 'superSilentEnabled', 'aimbotWallCheck', 'aimbotWallBangs', 'aimbotTeamCheck', 'aimbotBotCheck', 'legitAimbot', 'legitAiAim', 'drawFovCircle', 'hideMenuButton', 'rainbowEsp', 'showWelcome', 'unlockSkins', 'unlockPremium', 'teamWithCheaters'].forEach(toggleUI);
+                ['flickSpeed', 'adsTremorReduction', 'aimRandomness', 'aimTremor', 'fovSize'].forEach(sliderUI);
+                const aimSel = menu.querySelector('.hvhm-select[data-setting="aimTarget"]');
+                if (aimSel) aimSel.value = this.settings.aimTarget || 'head';
+                menu.querySelectorAll('.hvhm-preset-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === preset));
+            }
+            this.currentPreset = preset;
+            this.applyMenuButtonVisibility();
+            this.notify({ title: 'Preset Applied', message: preset.toUpperCase() });
+        }
+
+        applyMenuButtonVisibility() {
+            const btn = document.getElementById('hvhm-menu-button');
+            if (btn) btn.style.display = this.settings.hideMenuButton ? 'none' : 'flex';
+        }
+
+        renderESPPreview() {
+            const canvas = this.espPreviewCanvas;
+            if (!canvas) return;
+            const ctx = this.espPreviewCtx;
+            if (!ctx) return;
+            const W = canvas.width;
+            const H = canvas.height;
+            ctx.clearRect(0, 0, W, H);
+            ctx.fillStyle = '#0d0815';
+            ctx.fillRect(0, 0, W, H);
+            ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < W; x += 25) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+            }
+            for (let y = 0; y < H; y += 25) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+            }
+            const cx = W / 2;
+            let top = 55;
+            let height = 230;
+            let width = 110;
+            if (this.espCharLoaded && this.espCharImg) {
+                const ratio = this.espCharImg.width / this.espCharImg.height;
+                width = height * ratio;
+                if (width > W - 16) {
+                    width = W - 16;
+                    height = width / ratio;
+                }
+                const dx = cx - width / 2;
+                top = (H - height) / 2 - 10;
+                if (this.settings.chamsEnabled) {
+                    const rgb = this.settings.chamsMode === 'rgb' ? Date.now() / 10 % 360 : null;
+                    const tint = rgb !== null ? 'hsl(' + rgb + ', 100%, 55%)' : this.settings.chamsColor;
+                    const tmp = document.createElement('canvas');
+                    tmp.width = Math.ceil(width);
+                    tmp.height = Math.ceil(height);
+                    const tctx = tmp.getContext('2d');
+                    tctx.drawImage(this.espCharImg, 0, 0, width, height);
+                    tctx.globalCompositeOperation = 'source-atop';
+                    tctx.fillStyle = tint;
+                    tctx.fillRect(0, 0, width, height);
+                    ctx.globalAlpha = 0.95;
+                    ctx.drawImage(tmp, dx, top, width, height);
+                    ctx.globalAlpha = 1;
+                } else {
+                    ctx.globalAlpha = 0.9;
+                    ctx.drawImage(this.espCharImg, dx, top, width, height);
+                    ctx.globalAlpha = 1;
+                }
+            }
+            const pad = 10;
+            const bx = cx - width / 2 - pad;
+            const by = top - pad;
+            const bw = width + pad * 2;
+            const bh = height + pad * 2;
+            const col = (kind, alpha = 1) => {
+                if (this.settings.rainbowEsp) {
+                    const hue = Date.now() / 15 % 360;
+                    return 'hsla(' + hue + ', 100%, 50%, ' + alpha + ')';
+                }
+                const base = kind === 'box' ? this.settings.boxColor : this.settings.espColor;
+                let r = 0, g = 0, b = 0;
+                if (base && base.length === 7) {
+                    r = parseInt(base.slice(1, 3), 16);
+                    g = parseInt(base.slice(3, 5), 16);
+                    b = parseInt(base.slice(5, 7), 16);
+                }
+                return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+            };
+            if (this.settings.espLines) {
+                ctx.beginPath();
+                ctx.moveTo(W / 2, H);
+                ctx.lineTo(cx, by + bh);
+                ctx.strokeStyle = col('esp', 0.9);
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+            if (this.settings.espSquare) {
+                ctx.strokeStyle = col('box', 0.35);
+                ctx.lineWidth = 4;
+                ctx.strokeRect(bx, by, bw, bh);
+                ctx.strokeStyle = col('box', 1);
+                ctx.lineWidth = 2;
+                ctx.strokeRect(bx, by, bw, bh);
+            }
+            if (this.settings.espHealth) {
+                const frac = 0.72;
+                const hx = bx - 9;
+                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                ctx.fillRect(hx, by, 5, bh);
+                ctx.fillStyle = '#FDD835';
+                ctx.fillRect(hx, by + bh * (1 - frac), 5, bh * frac);
+                ctx.font = 'bold 12px Rajdhani,sans-serif';
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#fff';
+                ctx.fillText('72', hx - 3, by + 14);
+            }
+            if (this.settings.espNameTags) {
+                const label = 'HVHM BOT' + (this.settings.espWeaponIcon ? '  AK-47' : '');
+                ctx.font = 'bold 13px Rajdhani,sans-serif';
+                ctx.textAlign = 'left';
+                const tw = ctx.measureText(label).width;
+                let iw = 0;
+                const ih = 18;
+                if (this.settings.espWeaponIcon && this.espWeaponLoaded && this.espWeaponImg) {
+                    iw = this.espWeaponImg.width * (ih / this.espWeaponImg.height);
+                }
+                const pw = tw + (iw > 0 ? iw + 6 : 0) + 16;
+                const ph = 26;
+                const px = cx - pw / 2;
+                const py = by - ph - 8;
+                if (this.settings.espInfoBackground) {
+                    ctx.fillStyle = 'rgba(15,15,15,0.7)';
+                    ctx.strokeStyle = col('box', 1);
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    if (ctx.roundRect) ctx.roundRect(px, py, pw, ph, 4);
+                    else ctx.rect(px, py, pw, ph);
+                    ctx.fill();
+                    ctx.stroke();
+                }
+                ctx.fillStyle = '#fff';
+                ctx.fillText(label, px + 8, py + 18);
+                if (iw > 0) {
+                    ctx.drawImage(this.espWeaponImg, px + 8 + tw + 6, py + (ph - ih) / 2, iw, ih);
+                }
+            }
+            ctx.font = 'bold 12px Rajdhani,sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#fff';
+            ctx.fillText('[24m]', cx, by + bh + 18);
+        }
+
+        drawCheaterTag(player) {
+            if (!this.settings.showCheaterRadar || !player || player.isYou || !player.active || player.health <= 0 || !player.name) return;
+            if (!this.lobbyCheatUsers.has(player.name)) return;
+            const entry = this.lobbyCheatUsers.get(player.name) || {};
+            const height = (player.height || this.PLAYER_HEIGHT) - ((player.crouchVal || 0) * this.CROUCH_FACTOR);
+            const half = this.PLAYER_WIDTH / 2;
+            const points = [
+                { x: player.x - half, y: player.y, z: player.z - half },
+                { x: player.x + half, y: player.y, z: player.z + half },
+                { x: player.x - half, y: player.y + height, z: player.z - half },
+                { x: player.x + half, y: player.y + height, z: player.z + half }
+            ].map(p => this.world2Screen(p)).filter(Boolean);
+            if (points.length < 2) return;
+            const xs = points.map(p => p.x), ys = points.map(p => p.y);
+            const xmin = Math.min(...xs), xmax = Math.max(...xs), ymin = Math.min(...ys);
+            const isOwner = entry.role === 'owner';
+            const isMod = entry.role === 'moderator';
+            const teaming = this.isTeamingFriendly() && entry.teamMode === true;
+            const color = isOwner ? '#d946ef' : isMod ? '#00f0ff' : teaming ? '#00ff88' : entry.teamMode ? '#ffaa00' : (this.settings.cheaterTagColor || '#ff0000');
+            const label = isOwner ? 'OWNER' : isMod ? 'MODERATOR' : teaming ? 'Cheater Friend' : 'CHEATER';
+            const ctx = this.ctx;
+            ctx.save();
+            ctx.shadowBlur = 0;
+            ctx.font = '700 10px Rajdhani, sans-serif';
+            ctx.textAlign = 'center';
+            const labelY = Math.max(12, ymin - 5);
+            const w = ctx.measureText(label).width + 12;
+            const bx = (xmin + xmax - w) / 2, by = labelY - 12;
+            ctx.fillStyle = 'rgba(10, 5, 5, 0.85)';
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            if (ctx.roundRect) ctx.roundRect(bx, by, w, 15, 3);
+            else ctx.rect(bx, by, w, 15);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = color;
+            ctx.fillText(label, (xmin + xmax) / 2, labelY);
+            ctx.restore();
+        }
+
+        featureBadge(setting) {
+            if (!this.settings.showFeatureStatus) return '';
+            const st = (this.featureStatuses || {})[setting];
+            if (!st) return '';
+            if (st.force_disabled === 1) {
+                this.settings[setting] = false;
+                return '<span class="hvhm-feature-badge hvhm-feature-off">OFF</span>';
+            }
+            return '<span class="hvhm-feature-badge">' + (st.status || 'OK') + '</span>';
+        }
+
+        panic() {
+            ['aimbotEnabled', 'autoFireEnabled', 'triggerbotEnabled', 'superSilentEnabled', 'legitAimbot', 'chamsEnabled', 'espLines', 'espNameTags', 'espWeapon', 'espWeaponIcon', 'espLevel', 'espDistance', 'skeletonESP', 'selfESP', 'selfSkeletonESP', 'drawFovCircle', 'wireframeEnabled', 'bulletTracers', 'hitmarkers'].forEach(k => { this.settings[k] = false; });
+            this.saveSettings('hvhm_settings', this.settings);
+            const c = document.querySelector('.hvhm-menu-container');
+            if (c) c.style.display = 'none';
+            try { this.notify({ title: 'Panic', message: 'Aimbot and visuals disabled' }); } catch (e) {}
+        }
+
+        async checkForUpdates() {
+            try {
+                const last = parseInt(localStorage.getItem('hvhm_update_check') || '0', 10);
+                if (Date.now() - last < 86400000) return;
+                localStorage.setItem('hvhm_update_check', Date.now().toString());
+                const res = await fetch('https://raw.githubusercontent.com/levifrsn63/krunker-loader/main/hvhm.user.js', { cache: 'no-store' });
+                if (!res.ok) return;
+                const text = await res.text();
+                const m = /@version\s+([0-9.]+)/.exec(text);
+                if (!m) return;
+                const cmp = (a, b) => {
+                    const pa = a.split('.').map(Number), pb = b.split('.').map(Number);
+                    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+                        if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0) ? 1 : -1;
+                    }
+                    return 0;
+                };
+                if (cmp(m[1], this.scriptVersion) > 0) {
+                    this.notify({ title: 'Update Available', message: 'hvhm ' + m[1] + ' is out (you have ' + this.scriptVersion + '). Update the userscript to get it.', timeout: 12000 });
+                }
+            } catch (e) {}
+        }
+
         showGUI() {
             if (this.game && !this.game.gameClosed) { if (document.pointerLockElement || document.mozPointerLockElement) { document.exitPointerLock(); } }
             window.showWindow(this.GUI.windowIndex);
+            try { this.fetchFeatureStatuses(); } catch (e) {}
         }
 
         initGameGUI() {
             const fontLink = document.createElement('link');
-            fontLink.href = 'https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap';
+            fontLink.href = 'https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Outfit:wght@300;400;600;700&display=swap';
             fontLink.rel = 'stylesheet';
             document.head.appendChild(fontLink);
 
             const menuCSS = `
-.hvhm-menu-container{position:fixed!important;top:18px!important;left:50%!important;transform:translateX(-50%)!important;width:960px!important;max-width:96vw!important;max-height:88vh!important;background:#151515!important;border:1px solid rgba(255,255,255,0.10)!important;border-radius:10px!important;box-shadow:0 14px 38px rgba(0,0,0,0.38)!important;color:#e8e8e8!important;font-family:'Instrument Sans','Segoe UI',system-ui,sans-serif!important;overflow:visible!important;display:flex!important;flex-direction:column!important;}
-.hvhm-menu{display:flex!important;flex-direction:column!important;width:100%!important;height:100%!important;background:#151515!important;border-radius:10px!important;overflow:hidden!important;}
-.hvhm-menu-titlebar{height:38px!important;display:flex!important;align-items:center!important;justify-content:space-between!important;padding:0 20px!important;box-sizing:border-box!important;background:#181818!important;border-bottom:1px solid rgba(255,255,255,.07)!important;color:#e8e8e8!important;font-size:12px!important;font-weight:700!important;letter-spacing:1.1px!important;text-transform:uppercase!important;cursor:move!important;user-select:none!important;flex-shrink:0!important;}
-.hvhm-menu-titlebar span:last-child{font-size:9px!important;color:rgba(255,255,255,.35)!important;font-weight:500!important;}
-.hvhm-tab-container{display:flex!important;flex-direction:row!important;background:#181818!important;border-bottom:1px solid rgba(255,255,255,0.07)!important;flex-shrink:0!important;border-radius:10px 10px 0 0!important;}
-.hvhm-tab{flex:1!important;display:flex!important;align-items:center!important;justify-content:center!important;gap:7px!important;text-align:center!important;padding:13px 8px!important;cursor:pointer!important;color:rgba(255,255,255,0.55)!important;text-transform:uppercase!important;letter-spacing:1.1px!important;font-weight:600!important;font-size:12px!important;border-right:1px solid rgba(255,255,255,0.05)!important;user-select:none!important;transition:color .15s,background .15s!important;}
-.hvhm-tab svg{width:15px!important;height:15px!important;fill:none!important;stroke:currentColor!important;stroke-width:1.8!important;flex-shrink:0!important;}
-.hvhm-tab:last-child{border-right:none!important;}
-.hvhm-tab:hover{color:rgba(255,255,255,0.7)!important;background:rgba(255,255,255,0.03)!important;}
-.hvhm-tab.active{background:#1d1d1d!important;color:#ededed!important;box-shadow:inset 0 -2px 0 #bdbdbd!important;}
-.hvhm-menu-body{display:flex!important;flex-direction:column!important;flex:1 1 auto!important;min-height:0!important;overflow:hidden!important;background:#141414!important;}
-.hvhm-tab-pane{display:none!important;flex:1 1 auto!important;min-height:0!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;align-content:start!important;gap:0!important;padding:4px 0!important;overflow-y:auto!important;}
-.hvhm-tab-pane.active{display:grid!important;}
-.hvhm-section{box-sizing:border-box!important;width:100%!important;font-weight:700!important;color:rgba(255,255,255,0.46)!important;text-transform:uppercase!important;font-size:10px!important;letter-spacing:1.2px!important;padding:18px 24px 7px!important;border-top:1px solid rgba(255,255,255,0.06)!important;}
-.hvhm-section:first-child{border-top:none!important;padding-top:6px!important;}
-.hvhm-menu-item{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:space-between!important;width:100%!important;min-width:0!important;box-sizing:border-box!important;padding:12px 24px!important;background:transparent!important;border:none!important;border-bottom:1px solid rgba(255,255,255,0.045)!important;cursor:pointer!important;transition:background .12s!important;}
+.hvhm-menu-container{position:fixed!important;top:18px!important;left:50%!important;transform:translateX(-50%)!important;width:1140px!important;max-width:97vw!important;max-height:92vh!important;background:#111111!important;border:1px solid rgba(255,255,255,0.09)!important;border-radius:16px!important;color:#e8eaf2!important;font-family:'Rajdhani','Outfit','Segoe UI',system-ui,sans-serif!important;overflow:visible!important;display:flex!important;flex-direction:column!important;animation:hvhmIn .35s cubic-bezier(0.16,1,0.3,1)!important;}
+@keyframes hvhmIn{from{opacity:0;transform:translateX(-50%) translateY(-14px) scale(.985);}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1);}}
+.hvhm-menu{display:flex!important;flex-direction:row!important;width:100%!important;height:100%!important;background:transparent!important;border-radius:16px!important;overflow:hidden!important;}
+.hvhm-side{display:flex!important;flex-direction:column!important;width:208px!important;flex-shrink:0!important;background:rgba(0,0,0,0.28)!important;border-right:1px solid rgba(255,255,255,0.08)!important;}
+.hvhm-menu-titlebar{display:flex!important;align-items:center!important;justify-content:space-between!important;padding:14px 16px 10px!important;box-sizing:border-box!important;background:transparent!important;color:rgba(255,255,255,0.35)!important;font-size:10px!important;font-weight:600!important;letter-spacing:2px!important;text-transform:uppercase!important;cursor:move!important;user-select:none!important;flex-shrink:0!important;}
+.hvhm-menu-titlebar span:last-child{font-size:10px!important;color:rgba(255,255,255,0.25)!important;}
+.hvhm-tab-container{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:6px!important;background:transparent!important;border-bottom:none!important;padding:6px 12px!important;flex:1!important;}
+.hvhm-tab{flex:none!important;display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:10px!important;text-align:center!important;padding:14px 8px!important;cursor:pointer!important;color:rgba(255,255,255,0.55)!important;text-transform:uppercase!important;letter-spacing:2px!important;font-weight:700!important;font-size:14px!important;font-family:'Rajdhani',sans-serif!important;border:1px solid transparent!important;border-radius:9px!important;background:transparent!important;user-select:none!important;transition:all .2s!important;}
+.hvhm-tab svg{width:16px!important;height:16px!important;fill:none!important;stroke:currentColor!important;stroke-width:1.8!important;flex-shrink:0!important;}
+.hvhm-tab:hover{color:#fff!important;background:rgba(255,255,255,0.04)!important;}
+.hvhm-tab.active{background:#232329!important;color:#fff!important;border-color:rgba(255,255,255,0.45)!important;}
+.hvhm-window-controls{display:flex!important;align-items:center!important;justify-content:center!important;margin:auto 0 0!important;flex:none!important;gap:0!important;padding:12px!important;}
+.hvhm-window-controls button{width:28px!important;height:28px!important;border:0!important;display:grid!important;place-items:center!important;background:transparent!important;color:rgba(255,255,255,0.35)!important;cursor:pointer!important;transition:color .15s,background .15s!important;padding:0!important;border-radius:6px!important;}
+.hvhm-window-controls button:hover{background:rgba(255,255,255,0.07)!important;color:#fff!important;}
+.hvhm-window-controls button svg{width:13px!important;height:13px!important;stroke-width:1.7!important;fill:none!important;stroke:currentColor!important;}
+.hvhm-window-controls .hvhm-close-btn:hover{background:rgba(120,120,120,0.85)!important;color:#fff!important;}
+.hvhm-menu-body{display:flex!important;flex-direction:column!important;flex:1 1 auto!important;min-height:0!important;overflow:hidden!important;background:rgba(0,0,0,0.22)!important;}
+.hvhm-tab-pane{display:none!important;flex:1 1 auto!important;min-height:0!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;align-content:start!important;gap:12px!important;padding:22px 24px!important;overflow-y:auto!important;scrollbar-width:thin!important;scrollbar-color:rgba(255,255,255,0.35) rgba(0,0,0,0.25)!important;}
+.hvhm-tab-pane::-webkit-scrollbar{width:7px!important;}
+.hvhm-tab-pane::-webkit-scrollbar-track{background:rgba(0,0,0,0.2)!important;}
+.hvhm-tab-pane::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.14)!important;border-radius:8px!important;}
+.hvhm-tab-pane::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.45)!important;}
+.hvhm-tab-pane.active{display:grid!important;animation:hvhmFade .3s ease!important;}
+@keyframes hvhmFade{from{opacity:0;transform:translateY(7px);}to{opacity:1;transform:translateY(0);}}
+.hvhm-section{box-sizing:border-box!important;width:100%!important;font-weight:700!important;color:#ffffff!important;text-transform:uppercase!important;font-size:12px!important;letter-spacing:2.5px!important;padding:20px 4px 4px!important;border-top:none!important;display:flex!important;align-items:center!important;font-family:'Rajdhani',sans-serif!important;}
+.hvhm-section::after{content:''!important;flex:1!important;height:1px!important;background:rgba(255,255,255,0.28)!important;margin-left:14px!important;}
+.hvhm-section:first-child{padding-top:0!important;}
+.hvhm-menu-item{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:space-between!important;width:100%!important;min-width:0!important;box-sizing:border-box!important;padding:15px 18px!important;background:rgba(255,255,255,0.025)!important;border:1px solid rgba(255,255,255,0.05)!important;border-radius:10px!important;cursor:pointer!important;transition:all .15s!important;}
 .hvhm-section,.hvhm-menu-item[data-setting-share],.hvhm-menu-item[data-setting="customSoundPack"]{grid-column:1 / -1!important;}
-.hvhm-menu-item:nth-of-type(odd){border-right:1px solid rgba(255,255,255,0.035)!important;}
-.hvhm-menu-item:hover{background:rgba(255,255,255,0.025)!important;}
-.hvhm-menu-item-content{display:flex!important;align-items:center!important;gap:12px!important;color:#f5f5f5!important;min-width:0!important;}
-.hvhm-menu-item-icon{width:17px!important;height:17px!important;fill:rgba(255,255,255,0.62)!important;stroke:currentColor!important;stroke-linecap:round!important;stroke-linejoin:round!important;flex-shrink:0!important;}
-.hvhm-menu-item-content label{cursor:pointer!important;font-size:15px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;}
+.hvhm-menu-item:hover{background:rgba(255,255,255,0.05)!important;border-color:rgba(255,255,255,0.35)!important;}
+.hvhm-menu-item.active{border-color:rgba(255,255,255,0.35)!important;}
+.hvhm-menu-item-content{display:flex!important;align-items:center!important;gap:12px!important;color:#e8eaf2!important;min-width:0!important;flex:1!important;}
+.hvhm-menu-item-icon{width:19px!important;height:19px!important;fill:none!important;stroke:rgba(255,255,255,0.55)!important;stroke-width:1.8!important;stroke-linecap:round!important;stroke-linejoin:round!important;flex-shrink:0!important;}
+.hvhm-menu-item.active .hvhm-menu-item-icon{stroke:#fff!important;}
+.hvhm-menu-item-content label{cursor:pointer!important;font-size:15px!important;font-weight:600!important;letter-spacing:.4px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;font-family:'Rajdhani',sans-serif!important;}
+.hvhm-menu-item[data-tip]:hover::after{content:attr(data-tip)!important;position:absolute!important;bottom:calc(100% + 8px)!important;left:50%!important;transform:translateX(-50%)!important;background:#1a1a1a!important;color:#c9c9c9!important;padding:8px 12px!important;border-radius:8px!important;font-size:12px!important;max-width:280px!important;z-index:100!important;border:1px solid rgba(255,255,255,0.4)!important;pointer-events:none!important;line-height:1.4!important;font-weight:500!important;white-space:normal!important;}
 .hvhm-controls{display:flex!important;align-items:center!important;gap:10px!important;flex-shrink:0!important;}
-.hvhm-toggle-switch{width:32px!important;height:18px!important;background:rgba(255,255,255,0.14)!important;border-radius:16px!important;position:relative!important;cursor:pointer!important;transition:background .15s!important;flex-shrink:0!important;}
-.hvhm-toggle-switch.active{background:#fff!important;}
-.hvhm-toggle-switch::after{content:''!important;position:absolute!important;top:2px!important;left:2px!important;width:14px!important;height:14px!important;background:#fff!important;border-radius:50%!important;transition:transform .15s!important;}
-.hvhm-toggle-switch.active::after{background:#000!important;transform:translateX(14px)!important;}
-.hvhm-slider-container{display:flex!important;align-items:center!important;gap:6px!important;}
-.hvhm-slider{width:140px!important;accent-color:#fff!important;}
-.hvhm-slider-value{width:46px!important;background:rgba(255,255,255,0.04)!important;color:#f5f5f5!important;border:1px solid rgba(255,255,255,0.14)!important;border-radius:6px!important;padding:2px 4px!important;font-family:ui-monospace,'IBM Plex Mono',monospace!important;font-size:11px!important;text-align:center!important;}
-.hvhm-select{min-width:118px!important;background:#111!important;color:#fff!important;border:1px solid rgba(255,255,255,.18)!important;border-radius:6px!important;padding:5px 8px!important;font:600 11px 'Instrument Sans',sans-serif!important;outline:none!important;cursor:pointer!important;}
+.hvhm-toggle-switch{width:46px!important;height:24px!important;background:rgba(255,255,255,0.09)!important;border:1px solid rgba(255,255,255,0.06)!important;border-radius:20px!important;position:relative!important;cursor:pointer!important;transition:all .2s!important;flex-shrink:0!important;}
+.hvhm-toggle-switch::after{content:''!important;position:absolute!important;top:2px!important;left:2px!important;width:18px!important;height:18px!important;background:#8a8a8a!important;border-radius:50%!important;transition:left .2s,background .2s!important;}
+.hvhm-toggle-switch.active{background:#ffffff!important;border-color:#ffffff!important;}
+.hvhm-toggle-switch.active::after{left:24px!important;background:#111!important;}
+.hvhm-slider-container{display:flex!important;align-items:center!important;gap:8px!important;}
+.hvhm-slider{width:130px!important;accent-color:#ffffff!important;}
+.hvhm-slider-value{width:46px!important;background:rgba(0,0,0,0.3)!important;color:#ffffff!important;border:1px solid rgba(255,255,255,0.3)!important;border-radius:6px!important;padding:3px 5px!important;font-family:'Rajdhani',sans-serif!important;font-weight:700!important;font-size:12px!important;text-align:center!important;}
+.hvhm-select{min-width:118px!important;background:#1a1a1a!important;color:#fff!important;border:1px solid rgba(255,255,255,.14)!important;border-radius:7px!important;padding:6px 9px!important;font:700 12px 'Rajdhani',sans-serif!important;letter-spacing:.5px!important;outline:none!important;cursor:pointer!important;}
+.hvhm-select option{background:#1a1a1a!important;}
 .hvhm-color-container{display:flex!important;align-items:center!important;gap:6px!important;}
 .hvhm-color-picker-input{width:24px!important;height:18px!important;padding:0!important;border:none!important;background:none!important;cursor:pointer!important;border-radius:4px!important;overflow:hidden!important;}
-.hvhm-color-preview{width:16px!important;height:16px!important;border:1px solid rgba(255,255,255,0.3)!important;border-radius:3px!important;flex-shrink:0!important;}
-.hvhm-inline-color{width:22px!important;height:22px!important;min-width:22px!important;padding:0!important;border:2px solid rgba(255,255,255,0.45)!important;border-radius:50%!important;background:none!important;overflow:hidden!important;cursor:pointer!important;}
+.hvhm-color-preview{width:30px!important;height:22px!important;border:1px solid rgba(255,255,255,0.2)!important;border-radius:6px!important;flex-shrink:0!important;}
+.hvhm-inline-color{width:24px!important;height:24px!important;min-width:24px!important;padding:0!important;border:2px solid rgba(255,255,255,0.55)!important;border-radius:50%!important;background:none!important;overflow:hidden!important;cursor:pointer!important;}
+.hvhm-inline-color.hvhm-visible-color{border-color:rgba(255,255,255,0.35)!important;}
 .hvhm-inline-color::-webkit-color-swatch-wrapper{padding:0!important;}
 .hvhm-inline-color::-webkit-color-swatch{border:none!important;border-radius:50%!important;}
-.hvhm-hk-btn{background:rgba(255,255,255,0.05)!important;color:#f5f5f5!important;border:1px solid rgba(255,255,255,0.14)!important;border-radius:6px!important;padding:3px 9px!important;cursor:pointer!important;font-family:ui-monospace,'IBM Plex Mono',monospace!important;font-size:11px!important;min-width:26px!important;text-align:center!important;}
-.hvhm-hk-btn.bound{background:#fff!important;color:#000!important;border-color:#fff!important;}
-.hvhm-esp-layout-panel{position:absolute!important;right:calc(100% + 12px)!important;top:0!important;width:350px!important;box-sizing:border-box!important;padding:14px!important;background:#151515!important;border:1px solid rgba(255,255,255,0.10)!important;border-radius:10px!important;box-shadow:0 14px 38px rgba(0,0,0,0.38)!important;color:#f5f5f5!important;user-select:none!important;}
-.hvhm-layout-title{font-size:13px!important;font-weight:700!important;letter-spacing:1.2px!important;text-transform:uppercase!important;margin-bottom:4px!important;}
-.hvhm-layout-help{font-size:11px!important;color:rgba(255,255,255,.48)!important;margin-bottom:12px!important;line-height:1.35!important;}
-.hvhm-esp-preview{position:relative!important;width:320px!important;height:390px!important;background:#0c0c0c!important;border:1px solid rgba(255,255,255,.10)!important;border-radius:8px!important;overflow:hidden!important;}
-.hvhm-preview-box{--esp-preview-color:#fff;position:absolute!important;left:120px!important;top:90px!important;width:80px!important;height:205px!important;border:2px solid var(--esp-preview-color)!important;box-sizing:border-box!important;pointer-events:none!important;background:linear-gradient(135deg,rgba(35,35,35,.62),rgba(255,255,255,.16))!important;}
+.hvhm-hk-btn{background:rgba(255,255,255,0.045)!important;color:#c9c9c9!important;border:1px solid rgba(255,255,255,0.1)!important;border-radius:6px!important;padding:5px 11px!important;cursor:pointer!important;font-family:'Rajdhani',sans-serif!important;font-weight:700!important;font-size:12px!important;min-width:30px!important;text-align:center!important;letter-spacing:.5px!important;}
+.hvhm-hk-btn:hover{border-color:#ffffff!important;color:#fff!important;}
+.hvhm-hk-btn.bound{background:rgba(255,255,255,0.14)!important;color:#ffffff!important;border-color:rgba(255,255,255,0.6)!important;}
+.hvhm-esp-layout-panel{position:absolute!important;right:calc(100% + 12px)!important;top:0!important;width:350px!important;box-sizing:border-box!important;padding:16px!important;background:#111111!important;border:1px solid rgba(255,255,255,0.09)!important;border-radius:14px!important;color:#e8eaf2!important;user-select:none!important;}
+.hvhm-layout-title{font-size:14px!important;font-weight:700!important;letter-spacing:2.5px!important;text-transform:uppercase!important;margin-bottom:4px!important;color:#fff!important;font-family:'Rajdhani',sans-serif!important;}
+.hvhm-layout-help{font-size:11px!important;color:rgba(255,255,255,.45)!important;margin-bottom:12px!important;line-height:1.35!important;}
+.hvhm-esp-preview{position:relative!important;width:320px!important;height:390px!important;background:#0a0a0a!important;border:1px solid rgba(255,255,255,.1)!important;border-radius:10px!important;overflow:hidden!important;}
+.hvhm-preview-box{--esp-preview-color:#fff;position:absolute!important;left:120px!important;top:90px!important;width:80px!important;height:205px!important;border:2px solid var(--esp-preview-color)!important;box-sizing:border-box!important;pointer-events:none!important;background:rgba(255,255,255,0.05)!important;}
 .hvhm-preview-box-depth{display:none!important;position:absolute!important;left:10px!important;top:-10px!important;width:100%!important;height:100%!important;border:2px solid var(--esp-preview-color)!important;box-sizing:border-box!important;opacity:.58!important;}
 .hvhm-preview-box.mode-3d{background:transparent!important;transform:none!important;}
 .hvhm-preview-box.mode-3d .hvhm-preview-box-depth{display:block!important;}
 .hvhm-preview-box.mode-3d::before,.hvhm-preview-box.mode-3d::after{content:''!important;position:absolute!important;width:14px!important;height:2px!important;background:var(--esp-preview-color)!important;transform:rotate(-45deg)!important;transform-origin:left center!important;opacity:.78!important;}
 .hvhm-preview-box.mode-3d::before{left:0!important;top:0!important;}
 .hvhm-preview-box.mode-3d::after{left:0!important;bottom:-2px!important;}
-.hvhm-preview-health{position:absolute!important;left:114px!important;top:90px!important;width:4px!important;height:205px!important;background:linear-gradient(to top,#43a047 0%,#fff 72%,rgba(255,255,255,.10) 72%,rgba(255,255,255,.10) 100%)!important;pointer-events:none!important;}
+.hvhm-preview-health{position:absolute!important;left:114px!important;top:90px!important;width:4px!important;height:205px!important;background:#43a047!important;pointer-events:none!important;}
 .hvhm-preview-element{position:absolute!important;transform:translate(-50%,-50%)!important;padding:1px 2px!important;border:1px solid transparent!important;border-radius:3px!important;background:transparent!important;color:#fff!important;font:600 10px/1.1 'IBM Plex Mono',ui-monospace,monospace!important;white-space:nowrap!important;cursor:grab!important;touch-action:none!important;}
-.hvhm-preview-element:hover,.hvhm-preview-element:active{cursor:grabbing!important;border-color:rgba(255,255,255,.32)!important;background:rgba(255,255,255,.08)!important;}
+.hvhm-preview-element:hover,.hvhm-preview-element:active{cursor:grabbing!important;border-color:rgba(255,255,255,.5)!important;background:rgba(255,255,255,.1)!important;}
 .hvhm-preview-weapon-icon{padding:1px 2px!important;}
 .hvhm-preview-weapon-icon img{display:block!important;width:42px!important;height:16px!important;object-fit:contain!important;pointer-events:none!important;}
-.hvhm-layout-reset{width:100%!important;margin-top:10px!important;padding:8px!important;background:#fff!important;color:#000!important;border:0!important;border-radius:6px!important;font:700 11px 'Instrument Sans',sans-serif!important;text-transform:uppercase!important;letter-spacing:.8px!important;cursor:pointer!important;}
-.hvhm-layout-reset:hover{background:#ddd!important;}
-.hvhm-menu-resize-handle{position:absolute!important;right:2px!important;bottom:2px!important;width:18px!important;height:18px!important;z-index:20!important;cursor:nwse-resize!important;background:linear-gradient(135deg,transparent 0 48%,rgba(255,255,255,.28) 49% 57%,transparent 58% 68%,rgba(255,255,255,.5) 69% 77%,transparent 78%)!important;}
+.hvhm-layout-reset{width:100%!important;margin-top:10px!important;padding:9px!important;background:#ffffff!important;color:#111!important;border:0!important;border-radius:7px!important;font:700 12px 'Rajdhani',sans-serif!important;text-transform:uppercase!important;letter-spacing:1px!important;cursor:pointer!important;}
+.hvhm-layout-reset:hover{background:#ffffff!important;color:#111!important;}
+.hvhm-menu-resize-handle{position:absolute!important;right:3px!important;bottom:3px!important;width:16px!important;height:16px!important;z-index:20!important;cursor:nwse-resize!important;background:rgba(255,255,255,0.12)!important;border-radius:4px 0 12px 0!important;}
 @media(max-width:1360px){.hvhm-esp-layout-panel{right:auto!important;left:calc(100% + 8px)!important;}}
-@media(max-width:760px){.hvhm-tab-pane.active{display:flex!important;}.hvhm-menu-item{border-right:none!important;}.hvhm-esp-layout-panel{display:none!important;}}
-
-.hvhm-hotkey-modal{position:fixed!important;inset:0!important;background:rgba(0,0,0,0.7)!important;display:none!important;align-items:center!important;justify-content:center!important;z-index:2147483647!important;}
+@media(max-width:760px){.hvhm-menu{flex-direction:column!important;}.hvhm-side{width:100%!important;border-right:none!important;border-bottom:1px solid rgba(255,255,255,0.08)!important;}.hvhm-tab-container{flex-direction:row!important;}.hvhm-tab{justify-content:center!important;}.hvhm-window-controls{display:none!important;}.hvhm-tab-pane.active{display:flex!important;flex-direction:column!important;}.hvhm-esp-layout-panel{display:none!important;}}
+.hvhm-hotkey-modal{position:fixed!important;inset:0!important;background:rgba(0,0,0,0.72)!important;display:none!important;align-items:center!important;justify-content:center!important;z-index:2147483647!important;}
 .hvhm-hotkey-modal.active{display:flex!important;}
-.hvhm-hotkey-modal-box{background:#0a0a0a!important;border:1px solid rgba(255,255,255,0.14)!important;border-radius:12px!important;padding:24px!important;text-align:center!important;color:#f5f5f5!important;font-family:'Instrument Sans',sans-serif!important;box-shadow:0 20px 60px rgba(0,0,0,0.6)!important;}
-.hvhm-hotkey-modal-box button{margin-top:14px!important;padding:8px 20px!important;background:#fff!important;color:#000!important;border:none!important;border-radius:8px!important;cursor:pointer!important;font-family:inherit!important;font-weight:600!important;}
-.hvhm-notify-container{position:fixed!important;top:14px!important;right:14px!important;display:flex!important;flex-direction:column!important;gap:8px!important;z-index:2147483647!important;}
-.hvhm-notify{background:#0a0a0a!important;border-left:3px solid #fff!important;color:#f5f5f5!important;padding:10px 14px!important;min-width:200px!important;border-radius:8px!important;box-shadow:0 4px 20px rgba(0,0,0,0.5)!important;}
-.hvhm-notify-title{font-weight:700!important;color:#fff!important;margin-bottom:2px!important;}
-.hvhm-notify-message{font-size:12px!important;color:rgba(255,255,255,0.55)!important;}
+.hvhm-hotkey-modal-box,.hvhm-hotkey-content{background:#141414!important;border:1px solid rgba(255,255,255,0.4)!important;border-radius:14px!important;padding:28px 36px!important;text-align:center!important;color:#e8eaf2!important;font-family:'Rajdhani',sans-serif!important;animation:hvhmPop .25s cubic-bezier(0.16,1,0.3,1)!important;}
+@keyframes hvhmPop{from{opacity:0;transform:scale(.93);}to{opacity:1;transform:scale(1);}}
+.hvhm-hotkey-content h2{color:#ffffff!important;font-size:22px!important;font-weight:700!important;letter-spacing:2px!important;margin:0 0 10px!important;}
+.hvhm-hotkey-content p{color:#b5b5b5!important;font-size:14px!important;margin:0 0 6px!important;}
+.hvhm-hotkey-content p span{color:#fff!important;font-weight:700!important;}
+.hvhm-hotkey-modal-box button{margin-top:14px!important;padding:8px 20px!important;background:#ffffff!important;color:#111!important;border:none!important;border-radius:8px!important;cursor:pointer!important;font-family:inherit!important;font-weight:700!important;}
+.hvhm-hotkey-modal-box button:hover{background:#ffffff!important;}
+#hvhm-notify-wrap{position:fixed!important;top:16px!important;right:16px!important;display:flex!important;flex-direction:column!important;gap:10px!important;z-index:2147483647!important;}
+.hvhm-notify-container{position:fixed!important;top:16px!important;right:16px!important;display:flex!important;flex-direction:column!important;gap:10px!important;z-index:2147483647!important;}
+.hvhm-notify,.hvhm-notify-card{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;background:#141414!important;border:1px solid rgba(255,255,255,0.4)!important;border-left:3px solid #ffffff!important;border-radius:10px!important;padding:11px 15px!important;min-width:220px!important;max-width:340px!important;font-family:'Rajdhani',sans-serif!important;transform:translateX(calc(100% + 20px))!important;opacity:0!important;transition:transform .35s cubic-bezier(0.16,1,0.3,1),opacity .35s!important;}
+.hvhm-notify.visible,.hvhm-notify-card.visible{transform:translateX(0)!important;opacity:1!important;}
+.hvhm-notify-content{display:flex!important;align-items:center!important;gap:11px!important;min-width:0!important;}
+.hvhm-notify-logo{width:30px!important;height:30px!important;flex:0 0 30px!important;border-radius:50%!important;background:#ffffff!important;}
+.hvhm-notify-texts{display:flex!important;flex-direction:column!important;min-width:0!important;}
+.hvhm-notify-title{font-weight:700!important;color:#fff!important;font-size:14px!important;letter-spacing:1px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;}
+.hvhm-notify-message{font-size:12px!important;color:#b5b5b5!important;line-height:1.35!important;}
+.hvhm-notify-controls{display:flex!important;align-items:center!important;gap:8px!important;}
+.hvhm-notify-action-btn{background:rgba(255,255,255,0.12)!important;color:#ffffff!important;padding:6px 13px!important;border-radius:6px!important;font-size:12px!important;font-weight:700!important;border:1px solid rgba(255,255,255,0.5)!important;cursor:pointer!important;white-space:nowrap!important;}
+.hvhm-notify-action-btn:hover{background:#ffffff!important;color:#111!important;}
+.hvhm-feature-badge{display:inline-block!important;margin-left:8px!important;padding:1px 8px!important;font-size:10px!important;font-weight:700!important;letter-spacing:1px!important;border-radius:10px!important;background:rgba(255,255,255,0.12)!important;color:#ffffff!important;border:1px solid rgba(255,255,255,0.5)!important;vertical-align:middle!important;}
+.hvhm-feature-badge.hvhm-feature-off{background:rgba(170,170,180,0.12)!important;color:#9a9aa2!important;border-color:rgba(170,170,180,0.5)!important;}
+.hvhm-preset-row{display:flex!important;gap:10px!important;grid-column:1 / -1!important;padding:2px 0 8px!important;}
+.hvhm-preset-btn{flex:1!important;padding:11px 0!important;background:rgba(255,255,255,0.03)!important;border:1px solid rgba(255,255,255,0.09)!important;color:#fff!important;padding:9px 0!important;border-radius:8px!important;cursor:pointer!important;font-family:'Rajdhani',sans-serif!important;font-weight:700!important;font-size:13px!important;letter-spacing:1.5px!important;text-transform:uppercase!important;transition:all .15s!important;}
+.hvhm-preset-btn:hover{background:rgba(255,255,255,0.12)!important;border-color:rgba(255,255,255,0.5)!important;}
+.hvhm-preset-btn.active{background:rgba(255,255,255,0.2)!important;border-color:#ffffff!important;color:#ffffff!important;}
+#hvhm-menu-button{display:flex!important;align-items:center!important;padding:0 16px!important;height:44px!important;margin-right:15px!important;background:rgba(17,17,17,0.9)!important;border:1px solid rgba(255,255,255,0.4)!important;border-radius:10px!important;cursor:pointer!important;color:#ffffff!important;font:700 15px 'Rajdhani',sans-serif!important;letter-spacing:1.5px!important;}
+#hvhm-menu-button:hover{border-color:#ffffff!important;}
+.hvhm-menu-body.searching .hvhm-tab-pane{display:grid!important;}
+#hvhm-espPreview{width:100%!important;border-radius:8px!important;border:1px solid rgba(255,255,255,.1)!important;background:#0a0a0a!important;display:block!important;}
+
 `;
 
         const style = document.createElement('style');
@@ -1677,6 +2504,16 @@ this.gameVersion = (function () { try { var a = /let\s+[^\s=]+\s*=\s*['"]([0-9]+
         modalContainer.innerHTML = hotkeyModalHTML;
         document.body.appendChild(modalContainer);
         this.hotkeyModal = document.getElementById('hvhm-hotkeyModal');
+        this.waitFor(() => document.querySelector('.headerBarRight')).then((bar) => {
+            if (bar && !document.getElementById('hvhm-menu-button')) {
+                const btn = document.createElement('div');
+                btn.id = 'hvhm-menu-button';
+                btn.innerHTML = '<span>hvhm</span>';
+                btn.addEventListener('click', () => this.showGUI());
+                bar.prepend(btn);
+                this.applyMenuButtonVisibility();
+            }
+        });
 
         this.GUI.windowIndex = window.windows.length + 1;
         this.GUI.windowObj = {
@@ -1738,18 +2575,20 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
                 wireframeEnabled:'Wireframe rendering.', unlockSkins:'Client-side skin unlocker.',
                 bhopEnabled:'Hold space auto-jump.', antiAimEnabled:'Anti-aim pose: makes your character look down while preserving camera yaw.',
                 spectatorAlertEnabled:'Shows an alert when another player is spectating you.',
+                captureSafeOverlay:'Hides custom ESP/overlay drawing for screen sharing or recording. Toggle manually before capture.',
                 customSoundPack:'Plays a local replacement sound when your kill count increases. Built-in packs use Web Audio; custom sounds stay in local browser storage.',
                 autoNuke:'Auto nuke when available.', antikick:'Prevents inactivity kick.',
                 autoReload:'Auto reload when empty.',
                 thirdPersonEnabled: 'Play in 3rd person view.',
                 alwaysTrail: 'Always show bullet trails.',
                 weaponZoom: 'Adjust ADS zoom level (1 = default).',
-                fovChanger: 'Changes camera FOV. 0 = off; sniper ADS always keeps its native scope zoom.',
+                fovChanger: 'Locks the same camera FOV across hip-fire, ADS, and every weapon. 0 = off.',
                 chamsEnabled: 'Highlights player models with separate normal and visible colors.',
                 chamsThroughWalls: 'Chams render through walls (no depth).',
                 chamsEnemyColor: 'Color for enemy player models.',
                 chamsTeamColor: 'Color for teammate player models.',
                 chamsSelf: 'Also apply chams to your own player model.',
+                chamsTeammates: 'Include teammates in the chams pass. Disabled by default.',
                 chamsOpacity: 'Chams material opacity (1 = fully solid).',
                 rgbChams: 'Animated rainbow chams.',
                 weaponChamsEnabled: 'Highlights your gun / viewmodel.',
@@ -1769,22 +2608,34 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
 
             return `
 <div class="hvhm-menu">
-    <div class="hvhm-menu-titlebar"><span>hvhm control panel</span><span>drag to move</span></div>
-    <div class="hvhm-tab-container">
-        <div class="hvhm-tab active" data-tab="aimbot"><svg viewBox="0 0 24 24">${I.aimbot}</svg>Aimbot</div>
-        <div class="hvhm-tab" data-tab="esp"><svg viewBox="0 0 24 24">${I.espSquare}</svg>Visuals</div>
-        <div class="hvhm-tab" data-tab="misc"><svg viewBox="0 0 24 24">${I.settings}</svg>Misc</div>
-        <div class="hvhm-tab" data-tab="beta"><svg viewBox="0 0 24 24">${I.robot}</svg>Beta</div>
+    <div class="hvhm-side">
+        <div class="hvhm-menu-titlebar"><span>hvhm</span><span></span></div>
+        <div class="hvhm-tab-container">
+            <div class="hvhm-tab active" data-tab="aimbot"><svg viewBox="0 0 24 24">${I.aimbot}</svg>Aimbot</div>
+            <div class="hvhm-tab" data-tab="esp"><svg viewBox="0 0 24 24">${I.espSquare}</svg>Visuals</div>
+            <div class="hvhm-tab" data-tab="misc"><svg viewBox="0 0 24 24">${I.settings}</svg>Misc</div>
+            <div class="hvhm-tab" data-tab="beta"><svg viewBox="0 0 24 24">${I.robot}</svg>Beta</div>
+        </div>
+        <div class="hvhm-window-controls">
+            <button type="button" title="Close" class="hvhm-close-btn" onclick="document.querySelector('.hvhm-menu-container').style.display='none'"><svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>
     </div>
     <div class="hvhm-menu-body">
         <div class="hvhm-tab-pane active" id="hvhm-tab-aimbot">
+            <div class="hvhm-section">Presets</div>
+            <div class="hvhm-preset-row">
+                <button type="button" class="hvhm-preset-btn" data-preset="blatant">Blatant</button>
+                <button type="button" class="hvhm-preset-btn" data-preset="legit">Legit</button>
+                <button type="button" class="hvhm-preset-btn" data-preset="legitai">Legit+AI</button>
+                <button type="button" class="hvhm-preset-btn" data-preset="off">Off</button>
+            </div>
             <div class="hvhm-section">Activation</div>
             ${this.createMenuItemHTML('toggle','aimbotEnabled','Aimbot', I.aimbot, tips.aimbotEnabled)}
             ${this.createMenuItemHTML('toggle','aimbotOnAimKey','Aimkey Only', I.rightMouse, tips.aimbotOnAimKey)}
             ${this.createHotkeyMenuItemHTML('aimKey','Aim Key', I.rightMouse, tips.aimKey)}
             <div class="hvhm-section">Target Selection</div>
             ${this.createMenuItemHTML('toggle','aimbotFovCheck','FOV Check (off = all)', I.fov, tips.aimbotFovCheck)}
-            ${this.createSelectMenuItemHTML('aimBone','Aim Bone', I.aimbot, tips.aimBone, [['head','Head'],['neck','Neck'],['chest','Chest'],['pelvis','Pelvis']])}
+            ${this.createSelectMenuItemHTML('aimTarget','Aim Spot', I.aimbot, 'Choose where the aimbot targets on the enemy.', [['head','Head'],['torso','Torso'],['legs','Legs'],['random','Random']])}
             ${this.createMenuItemHTML('slider','fovSize','FOV Size', I.fov, tips.fovSize, 0, 1000, 1)}
             ${this.createMenuItemHTML('toggle','drawFovCircle','FOV Circle', I.fov, tips.drawFovCircle)}
             ${this.createMenuItemHTML('toggle','aimbotTeamCheck','Team Check', I.teamCheck, tips.aimbotTeamCheck)}
@@ -1796,6 +2647,7 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
             ${this.createMenuItemHTML('toggle','triggerbotEnabled','Triggerbot', I.autoFire, tips.triggerbotEnabled)}
             <div class="hvhm-section">Aim Behavior</div>
             ${this.createMenuItemHTML('toggle','legitAimbot','Legit Smoothing', I.aimbot, tips.legitAimbot)}
+            ${this.createMenuItemHTML('toggle','legitAiAim','Legit AI Aim', I.robot, 'Apply legit smoothing to bots.')}
             ${this.createMenuItemHTML('toggle','superSilentEnabled','Silent Aim', I.superSilent, tips.superSilentEnabled)}
             ${this.createMenuItemHTML('slider','flickSpeed','Flick Speed', I.aimbot, tips.flickSpeed, 0, 100, 1)}
             ${this.createMenuItemHTML('slider','aimRandomness','Aim Randomness', I.aimbot, tips.aimRandomness, 0, 100, 1)}
@@ -1807,10 +2659,15 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
             <div class="hvhm-section">Camera</div>
             ${this.createMenuItemHTML('toggle','thirdPersonEnabled','Third Person', I.robot, tips.thirdPersonEnabled)}
             ${this.createMenuItemHTML('toggle','alwaysTrail','Weapon Trails', I.line, tips.alwaysTrail)}
+            ${this.createMenuItemHTML('toggle','captureSafeOverlay','Capture-Safe Overlay', I.settings, tips.captureSafeOverlay)}
             ${this.createMenuItemHTML('slider','fovChanger','FOV Changer (0=off)', I.fov, tips.fovChanger, 0, 160, 1)}
+            ${this.createMenuItemHTML('slider','weaponZoom','Weapon Zoom', I.fov, 'Adjust ADS zoom level (1 = default).', 0.1, 5, 0.1)}
             <div class="hvhm-section">Overlay</div>
             ${this.createMenuItemHTML('slider','espScale','ESP Scale', I.espSquare, tips.espScale, 0.5, 2.5, 0.05)}
             ${this.createSelectMenuItemHTML('espBoxMode','ESP Box Style', I.espSquare, tips.espSquare, [['off','Off'],['2d','2D'],['3d','3D']], 'espBoxColor', 'espBoxVisibleColor')}
+            ${this.createMenuItemHTML('toggle','espSquare','ESP Box', I.espSquare, 'Simple 2D box around enemies.')}
+            ${this.createMenuItemHTML('toggle','espHealth','Health Stats', I.nameTags, 'Health bar and health text.')}
+            ${this.createMenuItemHTML('toggle','espInfoBackground','Info Background', I.espSquare, 'Background panel behind ESP info.')}
             ${this.createOverlayToggleHTML('espLines','ESP Lines', I.line, tips.espLines, 'espLineColor', 'espLineVisibleColor')}
             ${this.createSelectMenuItemHTML('espLineOrigin','Line Origin', I.line, tips.espLines, [['top','Top'],['center','Center'],['bottom','Bottom']])}
             ${this.createOverlayToggleHTML('espNameTags','Names', I.nameTags, tips.espNameTags, 'espNameColor', 'espNameVisibleColor')}
@@ -1820,6 +2677,7 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
             ${this.createOverlayToggleHTML('espDistance','Distance', I.espInfoBg, tips.espDistance, 'espDistanceColor', 'espDistanceVisibleColor')}
             ${this.createOverlayToggleHTML('skeletonESP','Skeleton', I.robot, tips.skeletonESP, 'skeletonColor', 'skeletonVisibleColor')}
             ${this.createMenuItemHTML('toggle','wireframeEnabled','Wireframe', I.wireframe, tips.wireframeEnabled)}
+            ${this.createMenuItemHTML('toggle','rainbowEsp','Rainbow ESP', I.palette, 'Cycling rainbow colors on ESP.')}
             <div class="hvhm-section">Self Overlay</div>
             ${this.createMenuItemHTML('toggle','selfESP','Self ESP', I.espSquare, tips.selfESP)}
             ${this.createMenuItemHTML('toggle','selfSkeletonESP','Self Skeleton', I.robot, tips.selfSkeletonESP)}
@@ -1827,6 +2685,7 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
             <div class="hvhm-section">Chams</div>
             ${this.createMenuItemHTML('toggle','chamsEnabled','Chams', I.palette, tips.chamsEnabled)}
             ${this.createMenuItemHTML('toggle','chamsSelf','Self Chams', I.robot, tips.chamsSelf)}
+            ${this.createMenuItemHTML('toggle','chamsTeammates','Teammate Chams', I.teamCheck, tips.chamsTeammates)}
             ${this.createSelectMenuItemHTML('chamsMode','Chams Color Mode', I.palette, tips.chamsEnabled, [['static','Static'],['rgb','RGB']], 'chamsColor', 'chamsVisibleColor')}
             ${this.createMenuItemHTML('slider','chamsOpacity','Chams Opacity', I.palette, tips.chamsOpacity, 0.1, 1, 0.05)}
             <div class="hvhm-section">Filters</div>
@@ -1847,7 +2706,18 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
             ${this.createMenuItemHTML('toggle','autoReload','Auto Reload', I.autoReload, tips.autoReload)}
             <div class="hvhm-section">Other</div>
             ${this.createMenuItemHTML('toggle','unlockSkins','Unlock All Skins', I.unlockSkins, tips.unlockSkins)}
+            ${this.createMenuItemHTML('toggle','unlockPremium','Unlock Premium', I.unlockSkins, 'Client-side Krunker Premium unlocker.')}
             ${this.createMenuItemHTML('toggle','spectatorAlertEnabled','Spectator Alert', I.nameTags, tips.spectatorAlertEnabled)}
+            ${this.createHotkeyMenuItemHTML('panicKey','Panic Key', I.wallOff, 'Instantly disable aimbot and all visuals.')}
+            ${this.createMenuItemHTML('toggle','middleMouseMenu','Middle Mouse Menu', I.rightMouse, 'Toggle menu with middle mouse button.')}
+            ${this.createMenuItemHTML('toggle','hideMenuButton','Hide Menu Button', I.wallOff, 'Hides the top bar menu trigger. Use Insert to open.')}
+            ${this.createMenuItemHTML('toggle','showWelcome','Welcome Message', I.nameTags, 'Show welcome notification on start.')}
+            <div class="hvhm-section">Cheater Radar</div>
+            ${this.createMenuItemHTML('toggle','showCheaterRadar','Show Cheaters', I.nameTags, 'Show detected script users in the lobby.')}
+            ${this.createMenuItemHTML('toggle','teamWithCheaters','Team With Cheaters', I.teamCheck, 'Treat lobby cheaters with team mode as teammates.')}
+            ${this.createMenuItemHTML('toggle','hideFromRadar','Hide From Radar', I.antiKick, 'Stop reporting yourself to the lobby server.')}
+            ${this.createMenuItemHTML('color','cheaterTagColor','Cheater Tag Color', I.palette, 'Customize the cheater tag color.')}
+            ${this.createMenuItemHTML('toggle','showFeatureStatus','Feature Status', I.unlockSkins, 'Show Working/Maintenance/Broken badges.')}
             <div class="hvhm-section">Settings Share</div>
             <div class="hvhm-menu-item" data-setting-share>
                 <div class="hvhm-menu-item-content"><svg class="hvhm-menu-item-icon" viewBox="0 0 24 24">${I.settings}</svg><label>Export / Import Code</label></div>
@@ -1855,6 +2725,11 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
                     <textarea data-hvhm-settings-code placeholder="Paste a settings code here" rows="2" style="width:260px;resize:vertical;background:#111;color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:6px;padding:5px;font:10px ui-monospace,monospace"></textarea>
                     <button type="button" data-hvhm-export-settings class="hvhm-hk-btn">Export</button>
                     <button type="button" data-hvhm-import-settings class="hvhm-hk-btn">Import</button>
+                    <input data-hvhm-config-name placeholder="Config name" maxlength="32" style="width:120px;background:#111;color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:6px;padding:5px;font:11px ui-monospace,monospace">
+                    <select data-hvhm-config-list style="width:120px;background:#111;color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:6px;padding:5px;font:11px ui-monospace,monospace"><option value="">Saved configs</option></select>
+                    <button type="button" data-hvhm-save-config class="hvhm-hk-btn">Save</button>
+                    <button type="button" data-hvhm-load-config class="hvhm-hk-btn">Load</button>
+                    <button type="button" data-hvhm-delete-config class="hvhm-hk-btn">Delete</button>
                 </div>
             </div>
         </div>
@@ -1881,7 +2756,7 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
         <div class="hvhm-preview-element" data-layout-element="weapon" style="color:${this.settings.espWeaponColor || '#ffffff'}">ASSAULT RIFLE</div>
         <div class="hvhm-preview-element" data-layout-element="distance" style="color:${this.settings.espDistanceColor || '#ffffff'}">25m</div>
     </div>
-    <button class="hvhm-layout-reset" type="button">Reset positions</button>
+        <button class="hvhm-layout-reset" type="button">Reset positions</button>
 </div>
 <div class="hvhm-menu-resize-handle" title="Resize menu"></div>
 `;
@@ -1918,7 +2793,7 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
                     break;
             }
             return `<div class="hvhm-menu-item ${this.settings[setting] ? 'active' : ''}" data-setting="${setting}"${tipAttr}>
-                <div class="hvhm-menu-item-content">${iconSVG}<label>${label}</label></div>
+                <div class="hvhm-menu-item-content">${iconSVG}<label>${label}</label>${this.featureBadge(setting)}</div>
                 <div class="hvhm-controls">${controlHTML}</div>
             </div>`;
         }
@@ -1929,7 +2804,7 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
             const key = this.hotkeys[setting] ? this.hotkeys[setting].replace('Key','').replace('Digit','').replace('Numpad','Num') : '-';
             const boundClass = this.hotkeys[setting] ? ' bound' : '';
             return `<div class="hvhm-menu-item" data-setting="${setting}"${tipAttr}>
-                <div class="hvhm-menu-item-content">${iconSVG}<label>${label}</label></div>
+                <div class="hvhm-menu-item-content">${iconSVG}<label>${label}</label>${this.featureBadge(setting)}</div>
                 <div class="hvhm-controls"><button class="hvhm-hk-btn${boundClass}" data-hk="${setting}">${key}</button></div>
             </div>`;
         }
@@ -1947,7 +2822,7 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
             const visibleColor = visibleColorSetting ? (this.settings[visibleColorSetting] || '#ffffff') : null;
             const colorHTML = `<input type="color" class="hvhm-color-picker-input hvhm-inline-color" data-setting="${colorSetting}" value="${color}" title="${label}: normal / not visible">${visibleColorSetting ? `<input type="color" class="hvhm-color-picker-input hvhm-inline-color hvhm-visible-color" data-setting="${visibleColorSetting}" value="${visibleColor}" title="${label}: player visible">` : ''}`;
             return `<div class="hvhm-menu-item ${this.settings[setting] ? 'active' : ''}" data-setting="${setting}"${tipAttr}>
-                <div class="hvhm-menu-item-content">${iconSVG}<label>${label}</label></div>
+                <div class="hvhm-menu-item-content">${iconSVG}<label>${label}</label>${this.featureBadge(setting)}</div>
                 <div class="hvhm-controls">
                     ${hotkeyHTML}
                     ${colorHTML}
@@ -1962,7 +2837,7 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
             const optionHTML = options.map(([value, text]) => `<option value="${value}" ${this.settings[setting] === value ? 'selected' : ''}>${text}</option>`).join('');
             const colorHTML = colorSetting ? `<input type="color" class="hvhm-color-picker-input hvhm-inline-color" data-setting="${colorSetting}" value="${this.settings[colorSetting] || '#ffffff'}" title="${label}: normal / not visible">${visibleColorSetting ? `<input type="color" class="hvhm-color-picker-input hvhm-inline-color hvhm-visible-color" data-setting="${visibleColorSetting}" value="${this.settings[visibleColorSetting] || '#ffffff'}" title="${label}: player visible">` : ''}` : '';
             return `<div class="hvhm-menu-item" data-setting="${setting}"${tipAttr}>
-                <div class="hvhm-menu-item-content">${iconSVG}<label>${label}</label></div>
+                <div class="hvhm-menu-item-content">${iconSVG}<label>${label}</label>${this.featureBadge(setting)}</div>
                 <div class="hvhm-controls">${colorHTML}<select class="hvhm-select" data-setting="${setting}">${optionHTML}</select></div>
             </div>`;
         }
@@ -1994,6 +2869,32 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
             const menu = document.querySelector('.hvhm-menu-container');
             if (!menu) return;
 
+            const configName = menu.querySelector('[data-hvhm-config-name]');
+            const configList = menu.querySelector('[data-hvhm-config-list]');
+            const refreshConfigs = () => {
+                if (!configList) return;
+                const selected = configList.value;
+                configList.innerHTML = '<option value="">Saved configs</option>';
+                for (const name of Object.keys(this.getNamedConfigs()).sort()) {
+                    const option = document.createElement('option'); option.value = name; option.textContent = name;
+                    configList.appendChild(option);
+                }
+                if (selected && this.getNamedConfigs()[selected]) configList.value = selected;
+            };
+            refreshConfigs();
+            menu.querySelector('[data-hvhm-save-config]')?.addEventListener('click', e => {
+                e.preventDefault(); e.stopPropagation();
+                if (this.saveNamedConfig(configName?.value)) { refreshConfigs(); this.notify({ title: 'Config', message: 'Configuration saved.' }); }
+            });
+            menu.querySelector('[data-hvhm-load-config]')?.addEventListener('click', e => {
+                e.preventDefault(); e.stopPropagation();
+                if (configList?.value) this.loadNamedConfig(configList.value);
+            });
+            menu.querySelector('[data-hvhm-delete-config]')?.addEventListener('click', e => {
+                e.preventDefault(); e.stopPropagation();
+                if (configList?.value && this.deleteNamedConfig(configList.value)) { refreshConfigs(); this.notify({ title: 'Config', message: 'Configuration deleted.' }); }
+            });
+
             menu.querySelector('.hvhm-tab-container').addEventListener('click', (e) => {
                 if (e.target.classList.contains('hvhm-tab')) {
                     if (window.SOUND) window.SOUND.play('select_0', 0.1);
@@ -2002,8 +2903,53 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
                     menu.querySelectorAll('.hvhm-tab-pane').forEach(p => p.classList.remove('active'));
                     e.target.classList.add('active');
                     menu.querySelector(`#hvhm-tab-${tabName}`).classList.add('active');
+                    try { localStorage.setItem('hvhm_last_tab', tabName); } catch (e) {}
                 }
             });
+
+            menu.querySelectorAll('.hvhm-preset-btn').forEach(btn => btn.addEventListener('click', (e) => {
+                e.preventDefault(); e.stopPropagation();
+                if (window.SOUND) window.SOUND.play('select_0', 0.1);
+                this.applyPreset(btn.dataset.preset);
+            }));
+
+            const searchInput = menu.querySelector('#hvhm-menu-search');
+            if (searchInput) {
+                searchInput.addEventListener('click', (e) => e.stopPropagation());
+                searchInput.addEventListener('input', () => {
+                    const q = searchInput.value.trim().toLowerCase();
+                    const body = menu.querySelector('.hvhm-menu-body');
+                    const panes = menu.querySelectorAll('.hvhm-tab-pane');
+                    menu.querySelectorAll('.hvhm-preset-row').forEach(r => { r.style.display = q ? 'none' : ''; });
+                    if (!q) {
+                        body.classList.remove('searching');
+                        const activeTab = menu.querySelector('.hvhm-tab.active');
+                        panes.forEach(p => p.classList.remove('active'));
+                        if (activeTab) {
+                            const tp = menu.querySelector(`#hvhm-tab-${activeTab.dataset.tab}`);
+                            if (tp) tp.classList.add('active');
+                        }
+                        return;
+                    }
+                    body.classList.add('searching');
+                    panes.forEach(pane => {
+                        pane.classList.add('active');
+                        pane.querySelectorAll('.hvhm-menu-item').forEach(item => {
+                            const label = (item.querySelector('label')?.textContent || '').toLowerCase();
+                            item.style.display = label.includes(q) ? '' : 'none';
+                        });
+                        pane.querySelectorAll('.hvhm-section').forEach(sec => {
+                            let next = sec.nextElementSibling;
+                            let show = false;
+                            while (next && !next.classList.contains('hvhm-section')) {
+                                if (next.classList.contains('hvhm-menu-item') && next.style.display !== 'none') { show = true; break; }
+                                next = next.nextElementSibling;
+                            }
+                            sec.style.display = show ? '' : 'none';
+                        });
+                    });
+                });
+            }
 
             menu.querySelector('.hvhm-menu-body').addEventListener('click', (e) => {
                 if (e.target.closest('.hvhm-inline-color') || e.target.closest('.hvhm-select')) return;
@@ -2023,6 +2969,8 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
                     menuItem.classList.toggle('active');
                     menuItem.querySelector('.hvhm-toggle-switch').classList.toggle('active');
                     this._refreshESPLayoutPreview(menu);
+                    if (setting === 'hideMenuButton') this.applyMenuButtonVisibility();
+
 
                 } else if (menuItem.querySelector('.hvhm-color-picker-input')) {
                     menuItem.querySelector('.hvhm-color-picker-input').click();
@@ -2036,6 +2984,7 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
                 const preview = menu.querySelector(`.hvhm-color-preview[data-setting="${setting}"]`);
                 if (preview) preview.style.backgroundColor = e.target.value;
                 this._refreshESPLayoutPreview(menu);
+                if (this.espPreviewCtx) { try { this.renderESPPreview(); } catch (e) {} }
 
             }));
             menu.querySelectorAll('.hvhm-inline-color').forEach(cp => cp.addEventListener('click', (e) => e.stopPropagation()));
@@ -2043,6 +2992,7 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
                 this.settings[e.target.dataset.setting] = e.target.value;
                 this.saveSettings('hvhm_settings', this.settings);
                 this._refreshESPLayoutPreview(menu);
+                if (this.espPreviewCtx) { try { this.renderESPPreview(); } catch (e) {} }
             }));
             const settingsCode = menu.querySelector('[data-hvhm-settings-code]');
             const exportSettings = menu.querySelector('[data-hvhm-export-settings]');
@@ -2078,8 +3028,22 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
                     if (valueInput) valueInput.value = value <= 0 ? 'Off' : value;
                     if (setting === 'fovChanger') this.updateFOV();
                     if (setting === 'espScale') this._refreshESPLayoutPreview(menu);
+
                 });
                 slider.addEventListener('change', () => this.saveSettings('hvhm_settings', this.settings));
+                const resetSlider = () => {
+                    const def = this.defaultSettings[setting];
+                    if (typeof def !== 'number') return;
+                    this.settings[setting] = def;
+                    slider.value = def;
+                    if (valueInput) valueInput.value = def <= 0 ? 'Off' : def;
+                    this.saveSettings('hvhm_settings', this.settings);
+                    if (setting === 'fovChanger') this.updateFOV();
+                    if (setting === 'espScale') this._refreshESPLayoutPreview(menu);
+
+                };
+                slider.addEventListener('dblclick', resetSlider);
+                if (valueInput) valueInput.addEventListener('dblclick', resetSlider);
             });
 
             menu.querySelectorAll('.hvhm-slider-value').forEach(valueInput => {
@@ -2100,6 +3064,13 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
                 el.addEventListener('mouseenter', () => { if (window.SOUND) window.SOUND.play('hover_0', 0.1); });
             });
             this.bindESPLayoutEditor(menu);
+            try {
+                const lastTab = localStorage.getItem('hvhm_last_tab');
+                if (lastTab) {
+                    const tab = menu.querySelector(`.hvhm-tab[data-tab="${lastTab}"]`);
+                    if (tab) tab.click();
+                }
+            } catch (e) {}
             this.bindMenuWindowInteraction(menu);
         }
 
@@ -2225,22 +3196,15 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
                     e.stopPropagation();
                     const item = config[node.dataset.layoutElement];
                     if (!item) return;
-                    const startX = e.clientX;
-                    const startY = e.clientY;
-                    const originalX = Number(this.settings[item.xKey]) || 0;
-                    const originalY = Number(this.settings[item.yKey]) || 0;
-                    const startLeft = parseFloat(node.style.left) || item.x + originalX;
-                    const startTop = parseFloat(node.style.top) || item.y + originalY;
                     const previewRect = preview.getBoundingClientRect();
-                    const nodeRect = node.getBoundingClientRect();
-                    const grabOffsetX = e.clientX - nodeRect.left;
-                    const grabOffsetY = e.clientY - nodeRect.top;
                     node.setPointerCapture(e.pointerId);
                     const move = moveEvent => {
-                        const targetLeft = Math.max(0, Math.min(preview.clientWidth, moveEvent.clientX - previewRect.left - grabOffsetX + nodeRect.width / 2));
-                        const targetTop = Math.max(0, Math.min(preview.clientHeight, moveEvent.clientY - previewRect.top - grabOffsetY + nodeRect.height / 2));
-                        this.settings[item.xKey] = Math.round(originalX + targetLeft - startLeft);
-                        this.settings[item.yKey] = Math.round(originalY + targetTop - startTop);
+                        const targetLeft = Math.max(8, Math.min(preview.clientWidth - 8, moveEvent.clientX - previewRect.left));
+                        const targetTop = Math.max(8, Math.min(preview.clientHeight - 8, moveEvent.clientY - previewRect.top));
+                        // Store offsets relative to the fixed preview anchor.
+                        // This avoids feedback from the node's transformed box.
+                        this.settings[item.xKey] = Math.round(targetLeft - item.x);
+                        this.settings[item.yKey] = Math.round(targetTop - item.y);
                         this._refreshESPLayoutPreview(menu);
                     };
                     const stop = () => {
@@ -2271,6 +3235,7 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
                 const mouseCode = `Mouse${e.button}`;
                 this.pressedKeys.add(mouseCode);
                 if (e.button === 2) this.rightMouseDown = true;
+                if (e.button === 1 && this.settings.middleMouseMenu && !this.isBindingHotkey) { e.preventDefault(); this.showGUI(); return; }
                 if (!this.isBindingHotkey) return;
                 e.preventDefault(); e.stopPropagation();
                 const duplicate = Object.keys(this.hotkeys).find(key => key !== this.currentBindingSetting && this.hotkeys[key] === mouseCode);
@@ -2326,6 +3291,7 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
                     const holdAction = action === 'aimKey' || action === 'aeroSpinOverride';
                     if (!holdAction) { e.preventDefault(); e.stopPropagation(); }
                     if (action === 'toggleMenu') { this.showGUI(); }
+                    else if (action === 'panicKey') { e.preventDefault(); e.stopPropagation(); this.panic(); }
                     else if (this.settings.hasOwnProperty(action)) {
                         this.settings[action] = !this.settings[action];
                         this.saveSettings('hvhm_settings', this.settings);
@@ -2360,7 +3326,10 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
         hideHotkeyModal() { if (!this.hotkeyModal) return; this.isBindingHotkey = false; this.currentBindingSetting = null; this.hotkeyModal.classList.remove('active'); }
 
         isDefined(val) { return val !== undefined && val !== null; }
-        isTeam(player) { return this.me && this.me.team ? this.me.team === player.team : false; }
+        isTeam(player) {
+            if (player && typeof player.name === 'string' && this.isTeamingFriendly() && this.lobbyCheatUsers.get(player.name)?.teamMode === true) return true;
+            return this.me && this.me.team ? this.me.team === player.team : false;
+        }
         getDistanceSq(p1, p2) { return (p2.x - p1.x)**2 + (p2.y - p1.y)**2 + (p2.z - p1.z)**2; }
         getDirection(z1, x1, z2, x2) { return Math.atan2(x1 - x2, z1 - z2); }
         getXDirection(t,e,o,i,s,n){const r=s-e,a=Math.sqrt((i-t)**2+(s-e)**2+(n-o)**2);return Math.asin(r/a)}
@@ -2404,8 +3373,10 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
 
         lookDir(xDire, yDire) {
             this.controls.object.rotation.y = yDire;
-            this.controls[this.vars.pchObjc].rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, xDire));
-            this.controls.yDr = this.controls[this.vars.pchObjc].rotation.x % Math.PI;
+            const __pch = this.vars.pchObjc && this.controls[this.vars.pchObjc];
+            if (!__pch) return;
+            __pch.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, xDire));
+            this.controls.yDr = __pch.rotation.x % Math.PI;
             this.controls.xDr = this.controls.object.rotation.y % Math.PI;
             this.renderer.camera.updateProjectionMatrix();
             this.renderer.updateFrustum();
@@ -2413,7 +3384,9 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
 
         resetLookAt() {
             this.controls.object.rotation.y = this.controls.xDr;
-            this.controls[this.vars.pchObjc].rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.controls.yDr));
+            const __pch = this.vars.pchObjc && this.controls[this.vars.pchObjc];
+            if (!__pch) return;
+            __pch.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.controls.yDr));
             this.renderer.camera.updateProjectionMatrix();
             this.renderer.updateFrustum();
         }
@@ -2653,14 +3626,18 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
         }
 
         getAimPoint(target) {
-            const selected = this.settings.aimBone || 'head';
+            let selected = this.settings.aimTarget || 'head';
+            if (selected === 'random') {
+                const r = Math.random();
+                selected = r < 0.33 ? 'head' : r < 0.66 ? 'torso' : 'legs';
+            }
             const isBot = !!target.isBot;
             const botSize = Number(target.dat && target.dat.mSize) || this.PLAYER_HEIGHT;
             const headY = isBot
                 ? Number(target.y) - botSize / 2
                 : Number(target.y) - (Number(target.crouchVal) || 0) * this.CROUCH_FACTOR + (Number(this.me && this.me.crouchVal) || 0) * this.CROUCH_FACTOR;
             const scale = isBot ? Math.max(0.5, botSize / this.PLAYER_HEIGHT) : 1;
-            const lowerOffset = ({ head: 0, neck: 1.05, chest: 2.45, pelvis: 4.5 }[selected] || 0) * scale;
+            const lowerOffset = ({ head: 0, torso: 2.45, legs: 4.5 }[selected] ?? 0) * scale;
             return { x: Number(target.x) || 0, y: headY - lowerOffset, z: Number(target.z) || 0 };
         }
 
@@ -2839,9 +3816,15 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
             const layout = this.getESPVisualLayout(xmin, ymin, xmax, ymax);
             const { width: visualBoxWidth, height: visualBoxHeight, centerX, scale: espScale } = layout;
             const playerVisible = isSelf || this.getCanSee(player);
-            const colorFor = (normalKey, visibleKey) => playerVisible
-                ? (this.settings[visibleKey] || this.settings[normalKey] || '#ffffff')
-                : (this.settings[normalKey] || '#ffffff');
+            const colorFor = (normalKey, visibleKey) => {
+                if (this.settings.rainbowEsp) {
+                    const hue = Date.now() / 15 % 360;
+                    return `hsla(${hue}, 100%, 50%, 1)`;
+                }
+                return playerVisible
+                    ? (this.settings[visibleKey] || this.settings[normalKey] || '#ffffff')
+                    : (this.settings[normalKey] || '#ffffff');
+            };
             const boxColor = colorFor('espBoxColor', 'espBoxVisibleColor');
             const lineColor = colorFor('espLineColor', 'espLineVisibleColor');
             const nameColor = colorFor('espNameColor', 'espNameVisibleColor');
@@ -2863,13 +3846,15 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
                 CRC2d.beginPath.apply(this.ctx, []); CRC2d.moveTo.apply(this.ctx, [startX, startY]); CRC2d.lineTo.apply(this.ctx, [endX, endY]); CRC2d.stroke.apply(this.ctx, []);
             }
 
-            if (showStandard && this.settings.espBoxMode === '2d') {
-                const boxFill = this.ctx.createLinearGradient(xmin, ymin, xmax, ymax);
-                boxFill.addColorStop(0, 'rgba(35,35,35,0.62)');
-                boxFill.addColorStop(0.55, 'rgba(120,120,120,0.28)');
-                boxFill.addColorStop(1, 'rgba(255,255,255,0.18)');
-                this.ctx.fillStyle = boxFill;
-                CRC2d.fillRect.apply(this.ctx, [xmin, ymin, visualBoxWidth, visualBoxHeight]);
+            if (showStandard && (this.settings.espSquare || this.settings.espBoxMode === '2d')) {
+                if (this.settings.espInfoBackground) {
+                    const boxFill = this.ctx.createLinearGradient(xmin, ymin, xmax, ymax);
+                    boxFill.addColorStop(0, 'rgba(35,35,35,0.62)');
+                    boxFill.addColorStop(0.55, 'rgba(120,120,120,0.28)');
+                    boxFill.addColorStop(1, 'rgba(255,255,255,0.18)');
+                    this.ctx.fillStyle = boxFill;
+                    CRC2d.fillRect.apply(this.ctx, [xmin, ymin, visualBoxWidth, visualBoxHeight]);
+                }
                 this.ctx.lineWidth = 1.5; this.ctx.strokeStyle = col;
                 CRC2d.strokeRect.apply(this.ctx, [xmin, ymin, visualBoxWidth, visualBoxHeight]);
             }
@@ -2878,7 +3863,7 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
                 this.drawSkeletonESP(player, xmin, ymin, xmax, ymax, espScale, skeletonColor);
             }
 
-            if (showStandard && player.health && player.maxHealth) {
+            if (showStandard && this.settings.espHealth && player.health && player.maxHealth) {
                 const healthPercentage = Math.max(0, player.health / player.maxHealth);
                 const { x: barX, y: barY, width: barWidth, height: barHeight } = layout.health;
                 this.ctx.fillStyle = "rgba(0,0,0,0.5)"; CRC2d.fillRect.apply(this.ctx, [barX, barY, barWidth, barHeight]);
