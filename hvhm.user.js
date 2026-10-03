@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name             hvhm – Krunker Cheat
 // @namespace        https://github.com/hvhm/hvhm
-// @version          1.10.38
+// @version          1.10.39
 // @description      Krunker aimbot, ESP, skins, bhop and mod menu.
 // @author           hvhm
 // @match            *://krunker.io/*
@@ -133,7 +133,8 @@
 
             this.defaultSettings = {
                 aimbotEnabled: true,
-                aimbotOnRightMouse: false,
+                aimbotOnAimKey: false,
+                aimbotFovCheck: true,
                 aimbotWallCheck: true,
                 aimbotWallBangs: false,
                 aimbotTeamCheck: true,
@@ -143,7 +144,7 @@
                 triggerbotEnabled: false,
                 fovSize: 90,
                 aimOffset: 0,
-                aimTarget: 'head',
+                aimBone: 'head',
                 drawFovCircle: false,
                 espLines: true,
             espBoxMode: "3d",
@@ -221,7 +222,6 @@
                 hitmarkers: false,
                 customSoundPack: 'off',
                 onlineSoundPackUrl: '',
-                legitAiAim: false,
                 espSquare: true,
                 espHealth: true,
                 espInfoBackground: true,
@@ -240,6 +240,7 @@
             this.defaultHotkeys = {
                 toggleMenu: 'Insert',
                 aimbotEnabled: 'F2',
+                aimKey: 'Mouse2',
                 bhopEnabled: 'F4',
                 autoFireEnabled: 'F5',
                 superSilentEnabled: 'F6',
@@ -278,7 +279,7 @@
                     try { this.notify({ title: 'Welcome', message: 'hvhm cheat loaded — press Insert for menu', timeout: 5000 }); } catch (e) {}
                 }
 
-            console.log("hvhm: Successfully Initialized! build 1.10.38-antigrace-10.0.0");
+            console.log("hvhm: Successfully Initialized! build 1.10.39-rewind199-10.0.0");
             } catch (error) {
                 console.error('hvhm: FATAL ERROR during initialization.', error);
             }
@@ -297,10 +298,6 @@
                 this.settings.espBoxMode = loadedSettings && loadedSettings.esp3DBoxes ? '3d' : (loadedSettings && loadedSettings.espSquare ? '2d' : 'off');
             }
             if (!loadedSettings || !loadedSettings.espBoxColor) this.settings.espBoxColor = (loadedSettings && (loadedSettings.esp3DBoxColor || loadedSettings.esp2DBoxColor)) || '#ffffff';
-            if ((!loadedSettings || !loadedSettings.aimTarget) && loadedSettings && loadedSettings.aimBone) {
-                const aimMap = { head: 'head', neck: 'head', chest: 'torso', pelvis: 'legs' };
-                this.settings.aimTarget = aimMap[loadedSettings.aimBone] || 'head';
-            }
             if (!loadedSettings || !loadedSettings.chamsMode) this.settings.chamsMode = loadedSettings && loadedSettings.rgbChams ? 'rgb' : 'static';
             if (!loadedSettings || !loadedSettings.chamsColor) this.settings.chamsColor = (loadedSettings && loadedSettings.chamsEnemyColor) || '#ff0000';
             this.hotkeys = { ...this.defaultHotkeys, ...loadedHotkeys };
@@ -863,7 +860,7 @@
             const original_strokeStyle = this.ctx.strokeStyle; const original_lineWidth = this.ctx.lineWidth;
             const original_font = this.ctx.font; const original_fillStyle = this.ctx.fillStyle;
             CRC2d.save.apply(this.ctx, []);
-            if (this.settings.fovSize > 0 && this.settings.drawFovCircle) {
+            if (this.settings.fovSize > 0 && this.settings.drawFovCircle && this.settings.aimbotFovCheck) {
                 const centerX = this.overlay.canvas.width / 2; const centerY = this.overlay.canvas.height / 2;
                 this.ctx.beginPath(); this.ctx.arc(centerX, centerY, this.settings.fovSize, 0, 2 * Math.PI, false);
                 this.ctx.lineWidth = 2; this.ctx.strokeStyle = 'rgba(255,255,255,0.7)';
@@ -1587,18 +1584,17 @@
             }
 
             let target = null;
-            if (this.settings.aimbotEnabled && (!this.settings.aimbotOnRightMouse || this.rightMouseDown)) {
+            const aimKeyHeld = Boolean(this.hotkeys.aimKey && this.pressedKeys.has(this.hotkeys.aimKey));
+            if (this.settings.aimbotEnabled && (!this.settings.aimbotOnAimKey || aimKeyHeld)) {
                 let potentialTargets = [];
+
                 for (let i = 0; i < this.game.players.list.length; i++) {
                     const p = this.game.players.list[i];
-                    const isTeammate = this.isTeam(p);
-                    const teamingFriendly = this.isTeamingFriendly();
                     const lobbyEntry = p.name ? this.lobbyCheatUsers.get(p.name) : null;
-                    const isOwner = lobbyEntry?.role === 'owner';
-                    const isMod = lobbyEntry?.role === 'moderator';
-                    const skipCheater = isOwner || isMod || teamingFriendly && p.name && lobbyEntry?.teamMode === true;
+                    const skipCheater = lobbyEntry?.role === 'owner' || lobbyEntry?.role === 'moderator' ||
+                        (this.isTeamingFriendly() && p.name && lobbyEntry?.teamMode === true);
                     if (this.isDefined(p) && !p.isYou && p.active && p.health > 0 &&
-                        (!this.settings.aimbotTeamCheck || !isTeammate) && !skipCheater &&
+                        (!this.settings.aimbotTeamCheck || !this.isTeam(p)) && !skipCheater &&
                         (!this.settings.aimbotWallCheck || this.getCanSee(p))) {
                         p.isBot = false;
                         potentialTargets.push(p);
@@ -1618,19 +1614,27 @@
 
                 potentialTargets.sort((a, b) => this.getDistanceSq(this.me, a) - this.getDistanceSq(this.me, b));
 
-                if (this.settings.fovSize > 0) {
+                if (this.settings.aimbotFovCheck && this.settings.fovSize > 0) {
                     const fovRadiusSq = this.settings.fovSize * this.settings.fovSize;
                     const centerX = this.overlay.canvas.width / 2;
                     const centerY = this.overlay.canvas.height / 2;
+
                     potentialTargets = potentialTargets.filter(p => {
-                        const screenPos = this.world2Screen({ x: p.x, y: p.y, z: p.z });
+                        const screenPos = this.world2Screen(this.getAimPoint(p));
                         if (!screenPos) return false;
-                        const distSq = (screenPos.x - centerX) ** 2 + (screenPos.y - centerY) ** 2;
+                        const distSq = (screenPos.x - centerX)**2 + (screenPos.y - centerY)**2;
                         return distSq <= fovRadiusSq;
                     });
                 }
 
-                target = potentialTargets[0] || null;
+                let bestTarget = potentialTargets[0] || null;
+                const prevTarget = this.aimbotTarget;
+                if (prevTarget && potentialTargets.includes(prevTarget) && bestTarget &&
+                    this.getDistanceSq(this.me, prevTarget) <= this.getDistanceSq(this.me, bestTarget) * 1.25) {
+                    bestTarget = prevTarget;
+                }
+                this.aimbotTarget = bestTarget;
+                target = bestTarget;
             }
 
             // Standalone legit triggerbot: checks the crosshair without moving
@@ -1648,36 +1652,15 @@
 
                 if (isMelee && distance > (this.me.weapon.canThrow ? throwRange : closeRange)) { }
                 else {
-                    // Aim-spot + eye-height math ported from Quirify's client:
-                    // fractional heights scale with crouch, pitch is computed
-                    // from the eye (not the feet).
-                    let targetY;
-                    if (target.isBot) {
-                        targetY = target.y - target.dat.mSize / 2;
-                    } else {
-                        const targetHeight = (target.height || this.PLAYER_HEIGHT) - ((target.crouchVal || 0) * this.CROUCH_FACTOR);
-                        let spot = this.settings.aimTarget || 'head';
-                        if (spot === 'random') {
-                            const r = Math.random();
-                            spot = r < 0.33 ? 'head' : r < 0.66 ? 'torso' : 'legs';
-                        }
-                        const off = (Number(this.settings.aimOffset) || 0);
-                        switch (spot) {
-                            case 'head': targetY = target.y + targetHeight * 0.88 + off; break;
-                            case 'torso': targetY = target.y + targetHeight * 0.55 + off; break;
-                            case 'legs': targetY = target.y + targetHeight * 0.15 + off; break;
-                            default: targetY = target.y + targetHeight * 0.88 + off; break;
-                        }
-                    }
-                    const yDire = this.getDirection(this.me.z, this.me.x, target.z, target.x);
-                    const eyeHeight = (this.me.height || this.PLAYER_HEIGHT) - ((this.me.crouchVal || 0) * this.CROUCH_FACTOR);
-                    const eyeY = this.me.y + eyeHeight - this.CAMERA_HEIGHT;
-                    const xDire = this.getXDirection(this.me.x, eyeY, this.me.z, target.x, targetY, target.z) - this.me.recoilAnimY * 0.3;
+                    const aimPoint = this.getAimPoint(target);
+                    const targetY = aimPoint.y + (Number(this.settings.aimOffset) || 0);
+                    const yDire = this.getDirection(this.me.z, this.me.x, aimPoint.z, aimPoint.x);
+                    const xDire = this.getXDirection(this.me.x, this.me.y, this.me.z, aimPoint.x, targetY, aimPoint.z) - (0.3 * this.me.recoilAnimY);
 
                     // Keep the original smooth target interpolation for both
                     // visible and silent aim. Silent aim only suppresses camera
                     // movement; it must not turn aiming into an inaccurate snap.
-                    if (this.settings.legitAimbot && (!target.isBot || this.settings.legitAiAim)) {
+                    if (this.settings.legitAimbot) {
                         let adsReduction = 1.0; if (this.me.aimVal < 1) { adsReduction = 1.0 - (this.settings.adsTremorReduction / 100.0); }
 
                         if (this.legitTarget !== target) {
@@ -1694,8 +1677,7 @@
                         this.aimOffset.y = Math.max(-wanderAmount, Math.min(wanderAmount, this.aimOffset.y));
 
                         const currentY = this.controls.object.rotation.y;
-                        const __pch = this.vars.pchObjc && this.controls[this.vars.pchObjc];
-                        const currentX = __pch ? __pch.rotation.x : 0;
+                        const currentX = this.controls[this.vars.pchObjc].rotation.x;
 
                         const finalX = xDire + this.aimOffset.y * 0.01;
                         const finalY = yDire + this.aimOffset.x * 0.01;
@@ -1722,36 +1704,36 @@
                     }
 
                     if (this.settings.autoFireEnabled) {
-                        // Screen-space confirmation instead of a scene raycast:
-                        // batched player bodies don't live under objInstances, so
-                        // raycasts can't see them. Fire once the aim point itself
-                        // renders near the crosshair.
-                        let confirmed = true;
-                        if (this.settings.legitAimbot) {
+                        this.playerMaps.length = 0; this.rayC.setFromCamera(this.vec2, this.renderer.fpsCamera);
+                        this.playerMaps = this.game.players.list.map(p => p.objInstances).filter(Boolean);
+                        let inCast = this.rayC.intersectObjects(this.playerMaps, true).length;
+                        // 10.0.0 batches bodies out of objInstances so the ray can
+                        // miss a perfectly lined-up target; fall back to checking
+                        // the aim point itself renders near the crosshair.
+                        if (!inCast) {
                             const aimScreen = this.world2Screen({ x: target.x, y: targetY, z: target.z });
-                            const cx = this.overlay.canvas.width / 2;
-                            const cy = this.overlay.canvas.height / 2;
-                            confirmed = !!aimScreen && Math.hypot(aimScreen.x - cx, aimScreen.y - cy) < 40 &&
-                                target.objInstances && this.containsPoint(target.objInstances.position);
-                        }
-                        // No aimVal gate: holding scope keeps aimVal above 0, which
-                        // would strangle autofire to a single shot per acquisition.
-                        if (this.me.reloadTimer === 0 && !this.me.didShoot && confirmed) {
-                            if (isMelee) {
-                                if (distance <= closeRange) { inputPacket[gameInputIndices.shoot] = 1; }
-                                else if (distance <= throwRange && this.me.weapon.canThrow) {
-                                    inputPacket[gameInputIndices.scope] = 1;
-                                    inputPacket[gameInputIndices.shoot] = 1;
-                                }
-                            } else {
-                                if (!this.me.weapon.noAim) inputPacket[gameInputIndices.scope] = 1;
-                                inputPacket[gameInputIndices.shoot] = 1;
+                            if (aimScreen) {
+                                const cx = this.overlay.canvas.width / 2;
+                                const cy = this.overlay.canvas.height / 2;
+                                if (Math.hypot(aimScreen.x - cx, aimScreen.y - cy) < 40) inCast = 1;
                             }
+                        }
+                        let canSee = target.objInstances && this.containsPoint(target.objInstances.position);
+                        if (isMelee) {
+                            if (distance <= closeRange && this.me.reloadTimer === 0 && !this.me.didShoot && this.me.aimVal === 0 && (!this.settings.legitAimbot || (inCast && canSee))) { inputPacket[gameInputIndices.shoot] = 1; }
+                            else if (distance <= throwRange && this.me.weapon.canThrow) {
+                                inputPacket[gameInputIndices.scope] = 1;
+                                if(this.me.aimVal === 0 && this.me.reloadTimer === 0 && !this.me.didShoot && (!this.settings.legitAimbot || (inCast && canSee))){ inputPacket[gameInputIndices.shoot] = 1; }
+                            }
+                        } else {
+                            if (!this.me.weapon.noAim) inputPacket[gameInputIndices.scope] = 1;
+                            if ((this.me.weapon.noAim || this.me.aimVal === 0) && this.me.reloadTimer === 0 && !this.me.didShoot && (!this.settings.legitAimbot || (inCast && canSee))) { inputPacket[gameInputIndices.shoot] = 1; }
                         }
                     }
                 }
             } else if (!target && this.game.gameState !== 4 && this.game.gameState !== 5) {
             this.legitTarget = null;
+            this.aimbotTarget = null;
                 if (!this.settings.superSilentEnabled && !this.settings.antiAimEnabled && !this.settings.antiAimSpinEnabled) {
                     this.resetLookAt();
                 }
@@ -2145,7 +2127,6 @@
                     this.settings.aimbotTeamCheck = true;
                     this.settings.aimbotBotCheck = true;
                     this.settings.legitAimbot = false;
-                    this.settings.legitAiAim = false;
                     this.settings.flickSpeed = 0;
                     this.settings.adsTremorReduction = 0;
                     this.settings.aimRandomness = 0;
@@ -2162,12 +2143,10 @@
                     this.settings.aimbotTeamCheck = true;
                     this.settings.aimbotBotCheck = true;
                     this.settings.legitAimbot = true;
-                    this.settings.legitAiAim = false;
                     this.settings.flickSpeed = 5;
                     this.settings.adsTremorReduction = 50;
                     this.settings.aimRandomness = 1.5;
                     this.settings.aimTremor = 0;
-                    this.settings.aimTarget = 'head';
                     this.settings.fovSize = 300;
                     this.settings.drawFovCircle = true;
                     break;
@@ -2180,12 +2159,10 @@
                     this.settings.aimbotTeamCheck = true;
                     this.settings.aimbotBotCheck = true;
                     this.settings.legitAimbot = true;
-                    this.settings.legitAiAim = true;
                     this.settings.flickSpeed = 5;
                     this.settings.adsTremorReduction = 50;
                     this.settings.aimRandomness = 1.5;
                     this.settings.aimTremor = 0;
-                    this.settings.aimTarget = 'head';
                     this.settings.fovSize = 300;
                     this.settings.drawFovCircle = true;
                     break;
@@ -2212,10 +2189,8 @@
                     if (sl) sl.value = this.settings[key];
                     if (sv) sv.value = this.settings[key] <= 0 ? 'Off' : this.settings[key];
                 };
-                ['aimbotEnabled', 'autoFireEnabled', 'superSilentEnabled', 'aimbotWallCheck', 'aimbotWallBangs', 'aimbotTeamCheck', 'aimbotBotCheck', 'legitAimbot', 'legitAiAim', 'drawFovCircle', 'hideMenuButton', 'rainbowEsp', 'showWelcome', 'unlockSkins', 'unlockPremium', 'teamWithCheaters'].forEach(toggleUI);
+                ['aimbotEnabled', 'autoFireEnabled', 'superSilentEnabled', 'aimbotWallCheck', 'aimbotWallBangs', 'aimbotTeamCheck', 'aimbotBotCheck', 'legitAimbot', 'drawFovCircle', 'hideMenuButton', 'rainbowEsp', 'showWelcome', 'unlockSkins', 'unlockPremium', 'teamWithCheaters'].forEach(toggleUI);
                 ['flickSpeed', 'adsTremorReduction', 'aimRandomness', 'aimTremor', 'fovSize'].forEach(sliderUI);
-                const aimSel = menu.querySelector('.hvhm-select[data-setting="aimTarget"]');
-                if (aimSel) aimSel.value = this.settings.aimTarget || 'head';
                 menu.querySelectorAll('.hvhm-preset-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === preset));
             }
             this.currentPreset = preset;
@@ -2642,7 +2617,7 @@
             };
 
             const tips = {
-                aimbotEnabled:'Master aimbot toggle.', aimbotOnRightMouse:'Only aim while right mouse is held.',
+                aimbotEnabled:'Master aimbot toggle.', aimbotOnAimKey:'Only activate while the assigned aim key is held.', aimKey:'Key held to activate the aimbot when Aimkey Only is enabled.', aimbotFovCheck:'When off, aimbot ignores FOV and targets everyone.',
                 aimbotWallCheck:'No target through walls.', aimbotWallBangs:'Shoot through penetrable walls.',
                 aimbotTeamCheck:'No target teammates.', aimbotBotCheck:'Target AI/bots.',
                 autoFireEnabled:'Auto fires for the aimbot target.', triggerbotEnabled:'Legit triggerbot: fires when an enemy crosses your crosshair, even with aimbot disabled.', superSilentEnabled:'Aims without moving camera.',
@@ -2710,27 +2685,30 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
                 <button type="button" class="hvhm-preset-btn" data-preset="legitai">Legit+AI</button>
                 <button type="button" class="hvhm-preset-btn" data-preset="off">Off</button>
             </div>
-            <div class="hvhm-section">General</div>
-            ${this.createMenuItemHTML('toggle','aimbotEnabled','Aimbot Enabled', I.aimbot, tips.aimbotEnabled)}
-            ${this.createMenuItemHTML('toggle','aimbotOnRightMouse','Right Mouse Trigger', I.rightMouse, tips.aimbotOnRightMouse)}
-            ${this.createMenuItemHTML('toggle','autoFireEnabled','Auto Fire', I.autoFire, tips.autoFireEnabled)}
-            ${this.createMenuItemHTML('toggle','superSilentEnabled','Super Silent Aim', I.superSilent, tips.superSilentEnabled)}
-            <div class="hvhm-section">Checks</div>
-            ${this.createMenuItemHTML('toggle','aimbotWallCheck','Wall Check', I.wall, tips.aimbotWallCheck)}
-            ${this.createMenuItemHTML('toggle','aimbotWallBangs','WallBangs', I.wallOff, tips.aimbotWallBangs)}
+            <div class="hvhm-section">Activation</div>
+            ${this.createMenuItemHTML('toggle','aimbotEnabled','Aimbot', I.aimbot, tips.aimbotEnabled)}
+            ${this.createMenuItemHTML('toggle','aimbotOnAimKey','Aimkey Only', I.rightMouse, tips.aimbotOnAimKey)}
+            ${this.createHotkeyMenuItemHTML('aimKey','Aim Key', I.rightMouse, tips.aimKey)}
+            <div class="hvhm-section">Target Selection</div>
+            ${this.createMenuItemHTML('toggle','aimbotFovCheck','FOV Check (off = all)', I.fov, tips.aimbotFovCheck)}
+            ${this.createSelectMenuItemHTML('aimBone','Aim Bone', I.aimbot, tips.aimBone, [['head','Head'],['neck','Neck'],['chest','Chest'],['pelvis','Pelvis']])}
+            ${this.createMenuItemHTML('slider','fovSize','FOV Size', I.fov, tips.fovSize, 0, 1000, 1)}
+            ${this.createMenuItemHTML('toggle','drawFovCircle','FOV Circle', I.fov, tips.drawFovCircle)}
             ${this.createMenuItemHTML('toggle','aimbotTeamCheck','Team Check', I.teamCheck, tips.aimbotTeamCheck)}
-            ${this.createMenuItemHTML('toggle','aimbotBotCheck','Bot Aim', I.robot, tips.aimbotBotCheck)}
-            <div class="hvhm-section">Legit Aim</div>
-            ${this.createMenuItemHTML('toggle','legitAimbot','Legit Aim', I.teamCheck, 'Simulates human-like aiming.')}
-            ${this.createMenuItemHTML('toggle','legitAiAim','Legit AI Aim', I.robot, 'Apply legit smoothing to bots.')}
-            ${this.createMenuItemHTML('slider','flickSpeed','Flick Speed', I.autoFire, 'Flick speed control.', 0, 100, 1)}
-            ${this.createMenuItemHTML('slider','adsTremorReduction','ADS Stability %', I.aimbot, 'Reduces tremor when ADS.', 0, 100, 1)}
-            ${this.createMenuItemHTML('slider','aimRandomness','Aim Wandering', I.line, 'Simulates imperfect aim.', 0, 20, 0.1)}
-            ${this.createMenuItemHTML('slider','aimTremor','Aim Tremor', I.wireframe, 'Hand tremor simulation.', 0, 20, 0.1)}
-            <div class="hvhm-section">Targeting</div>
-            ${this.createSelectMenuItemHTML('aimTarget','Aim Spot', I.aimbot, 'Choose where the aimbot targets on the enemy.', [['head','Head'],['torso','Torso'],['legs','Legs'],['random','Random']])}
-            ${this.createMenuItemHTML('slider','fovSize','FOV Size', I.fov, tips.fovSize, 0, 300, 1)}
-            ${this.createMenuItemHTML('toggle','drawFovCircle','Draw FOV Circle', I.espSquare, tips.drawFovCircle)}
+            ${this.createMenuItemHTML('toggle','aimbotBotCheck','Bot Check', I.robot, tips.aimbotBotCheck)}
+            ${this.createMenuItemHTML('toggle','aimbotWallCheck','Wall Check', I.wall, tips.aimbotWallCheck)}
+            ${this.createMenuItemHTML('toggle','aimbotWallBangs','Wall Bangs', I.wallOff, tips.aimbotWallBangs)}
+            <div class="hvhm-section">Fire Control</div>
+            ${this.createMenuItemHTML('toggle','autoFireEnabled','Auto Fire', I.autoFire, tips.autoFireEnabled)}
+            ${this.createMenuItemHTML('toggle','triggerbotEnabled','Triggerbot', I.autoFire, tips.triggerbotEnabled)}
+            <div class="hvhm-section">Aim Behavior</div>
+            ${this.createMenuItemHTML('toggle','legitAimbot','Legit Smoothing', I.aimbot, tips.legitAimbot)}
+            ${this.createMenuItemHTML('toggle','superSilentEnabled','Silent Aim', I.superSilent, tips.superSilentEnabled)}
+            ${this.createMenuItemHTML('slider','flickSpeed','Flick Speed', I.aimbot, tips.flickSpeed, 0, 100, 1)}
+            ${this.createMenuItemHTML('slider','aimRandomness','Aim Randomness', I.aimbot, tips.aimRandomness, 0, 100, 1)}
+            ${this.createMenuItemHTML('slider','aimTremor','Aim Tremor', I.aimbot, tips.aimTremor, 0, 100, 1)}
+            ${this.createMenuItemHTML('slider','adsTremorReduction','ADS Reduction', I.aimbot, tips.adsTremorReduction, 0, 100, 1)}
+            ${this.createMenuItemHTML('slider','aimOffset','Aim Offset', I.aimbot, tips.aimOffset, -100, 100, 1)}
         </div>
         <div class="hvhm-tab-pane" id="hvhm-tab-esp">
             <div class="hvhm-section">Camera</div>
@@ -3365,7 +3343,7 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
 
                 const action = Object.keys(this.hotkeys).find(key => this.hotkeys[key] === e.code);
                 if (action) {
-                    const holdAction = action === 'aeroSpinOverride';
+                    const holdAction = action === 'aimKey' || action === 'aeroSpinOverride';
                     if (!holdAction) { e.preventDefault(); e.stopPropagation(); }
                     if (action === 'toggleMenu') { this.showGUI(); }
                     else if (action === 'panicKey') { e.preventDefault(); e.stopPropagation(); this.panic(); }
@@ -3703,18 +3681,14 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
         }
 
         getAimPoint(target) {
-            let selected = this.settings.aimTarget || 'head';
-            if (selected === 'random') {
-                const r = Math.random();
-                selected = r < 0.33 ? 'head' : r < 0.66 ? 'torso' : 'legs';
-            }
+            const selected = this.settings.aimBone || 'head';
             const isBot = !!target.isBot;
             const botSize = Number(target.dat && target.dat.mSize) || this.PLAYER_HEIGHT;
             const headY = isBot
                 ? Number(target.y) - botSize / 2
                 : Number(target.y) - (Number(target.crouchVal) || 0) * this.CROUCH_FACTOR + (Number(this.me && this.me.crouchVal) || 0) * this.CROUCH_FACTOR;
             const scale = isBot ? Math.max(0.5, botSize / this.PLAYER_HEIGHT) : 1;
-            const lowerOffset = ({ head: 0, torso: 2.45, legs: 4.5 }[selected] ?? 0) * scale;
+            const lowerOffset = ({ head: 0, neck: 1.05, chest: 2.45, pelvis: 4.5 }[selected] || 0) * scale;
             return { x: Number(target.x) || 0, y: headY - lowerOffset, z: Number(target.z) || 0 };
         }
 
