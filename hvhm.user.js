@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name             hvhm – Krunker Cheat
 // @namespace        https://github.com/hvhm/hvhm
-// @version          1.10.39
+// @version          1.10.40
 // @description      Krunker aimbot, ESP, skins, bhop and mod menu.
 // @author           hvhm
 // @match            *://krunker.io/*
@@ -279,7 +279,7 @@
                     try { this.notify({ title: 'Welcome', message: 'hvhm cheat loaded — press Insert for menu', timeout: 5000 }); } catch (e) {}
                 }
 
-            console.log("hvhm: Successfully Initialized! build 1.10.39-rewind199-10.0.0");
+            console.log("hvhm: Successfully Initialized! build 1.10.40-spinfix-10.0.0");
             } catch (error) {
                 console.error('hvhm: FATAL ERROR during initialization.', error);
             }
@@ -1791,7 +1791,9 @@
                 inputPacket[idx.xdir] = -Math.PI * 500;
                 const moveIndex = inputPacket[idx.moveDir];
                 if (Number.isInteger(moveIndex) && moveIndex >= 0 && moveIndex < 8) {
-                    inputPacket[idx.moveDir] = ((moveIndex - spinSteps) % 8 + 8) % 8;
+                    // World move direction is movDirAngle - packetYaw, so the
+                    // move index must rotate WITH the spun yaw to hold still.
+                    inputPacket[idx.moveDir] = ((moveIndex + spinSteps) % 8 + 8) % 8;
                 }
             } else {
                 inputPacket[idx.ydir] = realYaw * 1000;
