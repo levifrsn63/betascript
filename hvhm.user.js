@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name             hvhm – Krunker Cheat
 // @namespace        https://github.com/hvhm/hvhm
-// @version          1.10.45
+// @version          1.10.46
 // @description      Krunker aimbot, ESP, skins, bhop and mod menu.
 // @author           hvhm
 // @match            *://krunker.io/*
@@ -42,6 +42,33 @@
   // Stash hook for deobf pipeline: the loader saves the downloaded game
   // source to window.__hvhmGameSource + IndexedDB after patching.
   // window.Function stays 100% native (Quirify parity).
+})();
+
+(function hvhmSocketDiag() {
+  try {
+    if (window.__hvhmSockDiag) return;
+    window.__hvhmSockDiag = true;
+    const NativeWS = window.WebSocket;
+    if (typeof NativeWS !== 'function') return;
+    const slog = (m) => { try { console.log('[hvhm-sock] ' + m); } catch (e) {} };
+    window.WebSocket = function (url, proto) {
+      slog('new ' + String(url).slice(0, 140));
+      const ws = proto === undefined ? new NativeWS(url) : new NativeWS(url, proto);
+      try {
+        ws.addEventListener('open', () => slog('open ' + String(url).slice(0, 100)));
+        ws.addEventListener('close', (e) => slog('close code=' + e.code + ' reason=' + (e.reason || '-') + ' clean=' + e.wasClean + ' url=' + String(url).slice(0, 80)));
+        ws.addEventListener('error', () => slog('error event (see close after)'));
+      } catch (e) {}
+      return ws;
+    };
+    window.WebSocket.prototype = NativeWS.prototype;
+    try {
+      window.WebSocket.OPEN = NativeWS.OPEN;
+      window.WebSocket.CONNECTING = NativeWS.CONNECTING;
+      window.WebSocket.CLOSING = NativeWS.CLOSING;
+      window.WebSocket.CLOSED = NativeWS.CLOSED;
+    } catch (e) {}
+  } catch (e) {}
 })();
 
 (function(uniqueId, CRC2d) {
@@ -284,7 +311,7 @@
                     try { this.notify({ title: 'Welcome', message: 'hvhm cheat loaded — press Insert for menu', timeout: 5000 }); } catch (e) {}
                 }
 
-            console.log("hvhm: Successfully Initialized! build 1.10.45-socketfix-10.0.0");
+            console.log("hvhm: Successfully Initialized! build 1.10.46-protoharden-10.0.0");
             } catch (error) {
                 console.error('hvhm: FATAL ERROR during initialization.', error);
             }
@@ -568,6 +595,10 @@
                                 if (q) { q.v = tok.v; url.searchParams.set('dataQuery', JSON.stringify(q)); u = url.toString(); }
                             } catch (e) { u = tok.u || u; }
                         } else if (tok && tok.u) { u = tok.u; }
+                        try {
+                            if (tok && (tok.u || tok.v)) console.log('hvhm: seek-game token captured, splicing');
+                            else console.log('hvhm: seek-game no token (5s fallback), plain request');
+                        } catch (e) {}
                     }
                     return Reflect.apply(target, thisArg, [u, ...rest]);
                 }
@@ -769,28 +800,34 @@
                             cheatInstance.socket = this; cheatInstance.wsEvent = this._dispatchEvent.bind(this); cheatInstance.wsSend = this.send.bind(this);
                             const _origSend = this.send;
                             this.send = function (type, ...message) {
-                                let data = message[0];
-                                if (type === 'en' && data) { cheatInstance.skinCache = { main: data[2][0], secondary: data[2][1], hat: data[3], body: data[4], knife: data[9], dye: data[14], waist: data[17], playerCard: data[32] }; }
-                                if (cheatInstance.settings.unlockSkins && type === '0' && Array.isArray(message[0])) cheatInstance.patchLocalCosmeticPacket(message[0]);
-                                if (cheatInstance.settings.unlockSkins && type === 'spry' && data && data !== 4577) { cheatInstance.skinCache.spray = data; }
+                                try {
+                                    let data = message[0];
+                                    if (type === 'en' && Array.isArray(data) && Array.isArray(data[2])) { cheatInstance.skinCache = { main: data[2][0], secondary: data[2][1], hat: data[3], body: data[4], knife: data[9], dye: data[14], waist: data[17], playerCard: data[32] }; }
+                                    if (cheatInstance.settings.unlockSkins && type === '0' && Array.isArray(message[0])) cheatInstance.patchLocalCosmeticPacket(message[0]);
+                                    if (cheatInstance.settings.unlockSkins && type === 'spry' && typeof data === 'number' && data !== 4577) { cheatInstance.skinCache.spray = data; }
+                                } catch (e) {}
                                 return _origSend.apply(this, [type, ...message]);
                             };
+                            try { this.send.toString = _origSend.toString.bind(_origSend); } catch (e) {}
                             try { this.send[cheatInstance.isProxy] = true; } catch (e) {}
                             const _origDispatch = this._dispatchEvent;
                             this._dispatchEvent = function (eventName, ...eventData) {
-                                if (eventName === 'ct' || eventName === 'chat') {
-                                    const scan = value => {
-                                        if (typeof value === 'string' && value.indexOf('HVHM|') !== -1) cheatInstance.handleHvhmText(value);
-                                        else if (Array.isArray(value)) value.forEach(scan);
-                                        else if (value && typeof value === 'object') ['text','message','msg','chat','content'].forEach(k => scan(value[k]));
-                                    };
-                                    eventData.forEach(scan);
-                                }
-                                if (eventName === 'error' && eventData[0][0].includes('Connection Banned')) { localStorage.removeItem('krunker_token'); cheatInstance.notify({ title: 'Banned', message: 'Due to a ban, you have been signed out.\nPlease connect to the game with a VPN.', timeout: 5000 }); }
-                                if (cheatInstance.settings.unlockSkins && eventName === '0') cheatInstance.patchLocalCosmeticPacket(eventData[0][0]);
-                                if (cheatInstance.settings.unlockSkins && eventName === 'sp') { eventData[0][1] = cheatInstance.skinCache.spray; }
+                                try {
+                                    if (eventName === 'ct' || eventName === 'chat') {
+                                        const scan = value => {
+                                            if (typeof value === 'string' && value.indexOf('HVHM|') !== -1) cheatInstance.handleHvhmText(value);
+                                            else if (Array.isArray(value)) value.forEach(scan);
+                                            else if (value && typeof value === 'object') ['text','message','msg','chat','content'].forEach(k => scan(value[k]));
+                                        };
+                                        eventData.forEach(scan);
+                                    }
+                                    if (eventName === 'error' && eventData[0] && typeof eventData[0][0] === 'string' && eventData[0][0].includes('Connection Banned')) { localStorage.removeItem('krunker_token'); cheatInstance.notify({ title: 'Banned', message: 'Due to a ban, you have been signed out.\nPlease connect to the game with a VPN.', timeout: 5000 }); }
+                                    if (cheatInstance.settings.unlockSkins && eventName === '0') cheatInstance.patchLocalCosmeticPacket(eventData[0][0]);
+                                    if (cheatInstance.settings.unlockSkins && eventName === 'sp') { eventData[0][1] = cheatInstance.skinCache.spray; }
+                                } catch (e) {}
                                 return _origDispatch.apply(this, [eventName, ...eventData]);
                             };
+                            try { this._dispatchEvent.toString = _origDispatch.toString.bind(_origDispatch); } catch (e) {}
                             try { this._dispatchEvent[cheatInstance.isProxy] = true; } catch (e) {}
                         }
                     },
@@ -853,6 +890,7 @@
                     },
                     get(target, prop) {
                         if (prop === self.isProxy) return true;
+                        if (prop === 'toString') return target.toString.bind(target);
                         return Reflect.get(target, prop);
                     }
                 });
