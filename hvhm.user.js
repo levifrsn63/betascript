@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name             hvhm – Krunker Cheat
 // @namespace        https://github.com/hvhm/hvhm
-// @version          1.10.41
+// @version          1.10.42
 // @description      Krunker aimbot, ESP, skins, bhop and mod menu.
 // @author           hvhm
 // @match            *://krunker.io/*
@@ -279,7 +279,7 @@
                     try { this.notify({ title: 'Welcome', message: 'hvhm cheat loaded — press Insert for menu', timeout: 5000 }); } catch (e) {}
                 }
 
-            console.log("hvhm: Successfully Initialized! build 1.10.41-spinjitter-10.0.0");
+            console.log("hvhm: Successfully Initialized! build 1.10.42-alwaysspin-10.0.0");
             } catch (error) {
                 console.error('hvhm: FATAL ERROR during initialization.', error);
             }
@@ -1770,16 +1770,9 @@
             if (!s.antiAimSpinEnabled) return;
 
             const inAir = !me.onGround;
-            const now = performance.now();
-            if (inAir && !this._aeroWasAirborne) this._aeroAirStartedAt = now;
-            this._aeroWasAirborne = inAir;
-            const justLeftGround = now - this._aeroAirStartedAt < 28;
-            const verticalVelocity = Number(me.velocity && me.velocity.y);
-            const landingNow = inAir && Number.isFinite(verticalVelocity) &&
-                verticalVelocity < -0.07 && !!me.canSlide;
-            const invertSpin = this._aeroSpinOverrideHeld === true;
-            const normalAeroSpin = inAir && !justLeftGround && !landingNow;
-            const wantSpin = invertSpin ? !inAir : normalAeroSpin;
+            // Spin on ground and in the air alike; holding the Aero override
+            // hotkey pauses the spin.
+            const wantSpin = !this._aeroSpinOverrideHeld;
 
             if (wantSpin) {
                 this.antiAimAngle += (s.antiAimSpinSpeed * 0.001) * Math.PI * 2;
@@ -2657,7 +2650,7 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
                 weaponChamsColor: 'Weapon chams color.',
                 weaponChamsOpacity: 'Weapon chams opacity.',
                 antiAimSpinSpeed: 'Anti-aim spin speed (desync rotation).',
-                aeroSpinOverride: 'Hold to invert Aero Spin: spin on the ground and stop spinning in the air.',
+                aeroSpinOverride: 'Hold to pause the spinbot while held.',
                 antiAimJitter: 'Adds subtle random wobble to anti-aim.',
                 antiAimSpinEnabled: 'Spinbot: continuously spins your yaw independently of the look-down anti-aim.',
                 airAntiAimEnabled: 'Aero anti-aim: spins in the air, applies look-down anti-aim on the ground.',
