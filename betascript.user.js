@@ -1,7 +1,7 @@
-// ==UserScript==
-// @name             betascript – Krunker Cheat
+﻿// ==UserScript==
+// @name             betascript ΓÇô Krunker Cheat
 // @namespace        https://github.com/levifrsn63/betascript
-// @version          1.10.63
+// @version          1.10.70
 // @description      Krunker aimbot, ESP, skins, bhop and mod menu.
 // @author           betascript
 // @match            *://krunker.io/*
@@ -27,7 +27,7 @@
     console.info('[betascript] Native-client test active; userscript hooks are skipped.');
     window.addEventListener('DOMContentLoaded', function () {
       const marker = document.createElement('div');
-      marker.textContent = 'Native client test active — userscript disabled for this page';
+      marker.textContent = 'Native client test active ΓÇö userscript disabled for this page';
       marker.style.cssText = 'position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:2147483647;padding:7px 12px;border:1px solid #999;border-radius:6px;background:#111;color:#fff;font:12px sans-serif;pointer-events:none';
       (document.body || document.documentElement).appendChild(marker);
     }, { once: true });
@@ -47,7 +47,7 @@
     (document.body||document.documentElement).appendChild(p); p.style.display=shown?'block':'none'; flush();
     if (window.__betaOfficialClientMode) {
       var marker=document.createElement('div');
-      marker.textContent='Official-client hooks test active — mirror skipped';
+      marker.textContent='Official-client hooks test active ΓÇö mirror skipped';
       marker.style.cssText='position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:2147483647;padding:7px 12px;border:1px solid #999;border-radius:6px;background:#111;color:#fff;font:12px sans-serif;pointer-events:none';
       document.body.appendChild(marker);
     }
@@ -57,7 +57,7 @@
     shown=!shown;
     if(p)p.style.display=shown?'block':'none';
   });
-  console.log('[betascript] loader active — game mirror 10.0.0 + live capture (build-agnostic)');
+  console.log('[betascript] loader active ΓÇö game mirror 10.0.0 + live capture (build-agnostic)');
   window['__xVb92__']='aB7k2m9Pq';
   window.OffCliV = true;
   // Stash hook for deobf pipeline: the loader saves the downloaded game
@@ -125,7 +125,6 @@
             this._aeroAirStartedAt = 0;
             this._aeroWasAirborne = false;
             this._tracers = [];
-            this._hitmarker = 0;
             this._lastShoot = false;
             this._origFirerate = undefined;
             this._baseSpeedLmt = undefined;
@@ -137,10 +136,6 @@
             this._baseFov = undefined;
             this._fovCameraLocks = new Map();
             this._rgbHue = 0;
-            this._lastKillCount = null;
-            this._lastDeathCount = null;
-            this._lastKillStreak = null;
-            this._soundContext = null;
             this.scriptId = localStorage.getItem('betascript_sid') || (() => { const c = 'abcdefghijklmnopqrstuvwxyz0123456789'; let s = ''; for (let i = 0; i < 8; i++) s += c[Math.floor(Math.random() * c.length)]; localStorage.setItem('betascript_sid', s); return s; })();
             this.scriptUsers = new Map();
             this._scriptObserver = null;
@@ -273,9 +268,6 @@
                 aimTremor: 0.2,
                 thirdPersonEnabled: false,
                 alwaysTrail: false,
-                cameraOffsetX: 0,
-                cameraOffsetY: 0,
-                cameraOffsetZ: 0,
             fovChanger: 0,
             chamsEnabled: false,
             chamsMode: "static",
@@ -285,11 +277,8 @@
             chamsSelf: false,
             chamsTeammates: false,
                 antiAimSpinSpeed: 300,
+                antiAimRotationOffset: 0,
                 noRecoil: false,
-                bulletTracers: false,
-                hitmarkers: false,
-                customSoundPack: 'off',
-                onlineSoundPackUrl: '',
                 espSquare: true,
                 espHealth: true,
                 espInfoBackground: true,
@@ -343,7 +332,7 @@
                 try { this.fetchFeatureStatuses(); } catch (e) {}
                 try { this.checkForUpdates(); } catch (e) {}
                 if (this.settings.showWelcome) {
-                    try { this.notify({ title: 'Welcome', message: 'betascript cheat loaded — press Insert for menu', timeout: 5000 }); } catch (e) {}
+                    try { this.notify({ title: 'Welcome', message: 'betascript cheat loaded ΓÇö press Insert for menu', timeout: 5000 }); } catch (e) {}
                 }
 
             console.log("betascript: Successfully Initialized! build 1.10.60-matchmaker-proxy-10.0.0");
@@ -367,6 +356,8 @@
             if (!loadedSettings || !loadedSettings.espBoxColor) this.settings.espBoxColor = (loadedSettings && (loadedSettings.esp3DBoxColor || loadedSettings.esp2DBoxColor)) || '#ffffff';
             if (!loadedSettings || !loadedSettings.chamsMode) this.settings.chamsMode = loadedSettings && loadedSettings.rgbChams ? 'rgb' : 'static';
             if (!loadedSettings || !loadedSettings.chamsColor) this.settings.chamsColor = (loadedSettings && loadedSettings.chamsEnemyColor) || '#ff0000';
+            // Keep old configs readable while making the style selector the
+            // single source of truth for box visibility and shape.
             this.settings.espSquare = this.settings.espBoxMode === '2d';
             this.hotkeys = { ...this.defaultHotkeys, ...loadedHotkeys };
             delete this.hotkeys.aeroSpinOverride;
@@ -493,140 +484,6 @@
             return true;
         }
 
-        updateCustomSoundPack() {
-            const kills = Number(this.me && this.me.kills);
-            const deaths = Number(this.me && this.me.deaths);
-            const streak = Number(this.me && this.me.killStreak);
-            if (Number.isFinite(kills)) {
-                if (this._lastKillCount === null || kills < this._lastKillCount) this._lastKillCount = kills;
-                else if (kills > this._lastKillCount) {
-                    const gained = Math.min(3, kills - this._lastKillCount);
-                    this._lastKillCount = kills;
-                    for (let i = 0; i < gained; i++) setTimeout(() => this.playSoundEvent('kill'), i * 70);
-                }
-            }
-            if (Number.isFinite(deaths)) {
-                if (this._lastDeathCount === null || deaths < this._lastDeathCount) this._lastDeathCount = deaths;
-                else if (deaths > this._lastDeathCount) { this._lastDeathCount = deaths; this.playSoundEvent('death'); }
-            }
-            if (Number.isFinite(streak)) {
-                if (this._lastKillStreak === null || streak < this._lastKillStreak) this._lastKillStreak = streak;
-                else if (streak > this._lastKillStreak) { this._lastKillStreak = streak; this.playSoundEvent('streak'); }
-            }
-        }
-
-        getOnlineSoundPack() {
-            try { return JSON.parse(localStorage.getItem('betascript_online_sound_pack') || 'null'); } catch (e) { return null; }
-        }
-
-        playSoundEvent(eventName, testOnly = false) {
-            const pack = this.settings.customSoundPack || 'off';
-            if (pack === 'online') {
-                const manifest = this.getOnlineSoundPack();
-                const url = manifest && manifest.sounds && manifest.sounds[eventName];
-                if (url) {
-                    const audio = new Audio(url);
-                    audio.volume = testOnly ? 0.75 : 0.65;
-                    audio.play().catch(() => {});
-                }
-                return;
-            }
-            if (eventName === 'kill') this.playCustomKillSound(testOnly);
-        }
-
-        async loadOnlineSoundPack() {
-            const url = String(this.settings.onlineSoundPackUrl || '').trim();
-            if (!/^https:\/\/[^\s]+$/i.test(url)) {
-                this.notify({ title: 'Sound Pack', message: 'Use an HTTPS URL to a JSON sound-pack manifest.' });
-                return;
-            }
-            try {
-                const response = await fetch(url, { cache: 'no-store' });
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const manifest = await response.json();
-                const sounds = manifest && manifest.sounds;
-                if (!sounds || typeof sounds !== 'object') throw new Error('Missing sounds object');
-                const clean = {};
-                for (const eventName of ['kill', 'death', 'streak', 'headshot']) {
-                    if (sounds[eventName] && /^https:\/\/[^\s]+$/i.test(String(sounds[eventName]))) clean[eventName] = String(sounds[eventName]);
-                }
-                if (!Object.keys(clean).length) throw new Error('No valid HTTPS sound URLs');
-                const stored = { name: String(manifest.name || 'Online pack').slice(0, 80), sounds: clean };
-                localStorage.setItem('betascript_online_sound_pack', JSON.stringify(stored));
-                this.settings.customSoundPack = 'online';
-                this.saveSettings('betascript_settings', this.settings);
-                this.notify({ title: 'Sound Pack', message: `${stored.name} loaded.` });
-            } catch (error) {
-                this.notify({ title: 'Sound Pack', message: `Could not load pack: ${error.message}` });
-            }
-        }
-
-        playCustomKillSound(testOnly = false) {
-            const pack = this.settings.customSoundPack || 'off';
-            if (pack === 'off') return;
-            if (pack === 'custom') {
-                let dataUrl = null;
-                try { dataUrl = localStorage.getItem('betascript_custom_kill_sound'); } catch (e) {}
-                if (!dataUrl) return;
-                const audio = new Audio(dataUrl);
-                audio.volume = 0.75;
-                audio.play().catch(() => {});
-                return;
-            }
-            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-            if (!AudioContextClass) return;
-            if (!this._soundContext) {
-                try { this._soundContext = new AudioContextClass(); } catch (e) { return; }
-            }
-            const context = this._soundContext;
-            if (context.state === 'suspended') context.resume().catch(() => {});
-            const now = context.currentTime;
-            const master = context.createGain();
-            master.gain.setValueAtTime(testOnly ? 0.12 : 0.09, now);
-            master.gain.exponentialRampToValueAtTime(0.001, now + (pack === 'arcade' ? 0.34 : 0.28));
-            master.connect(context.destination);
-            const notes = pack === 'arcade'
-                ? [[523.25, 0, 0.08], [659.25, 0.08, 0.08], [783.99, 0.16, 0.14]]
-                : [[660, 0, 0.07], [990, 0.055, 0.08], [1320, 0.11, 0.13]];
-            for (const [frequency, offset, duration] of notes) {
-                const oscillator = context.createOscillator();
-                const gain = context.createGain();
-                oscillator.type = pack === 'arcade' ? 'square' : 'triangle';
-                oscillator.frequency.setValueAtTime(frequency, now + offset);
-                gain.gain.setValueAtTime(0.0001, now + offset);
-                gain.gain.exponentialRampToValueAtTime(0.45, now + offset + 0.008);
-                gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + duration);
-                oscillator.connect(gain); gain.connect(master);
-                oscillator.start(now + offset); oscillator.stop(now + offset + duration + 0.02);
-            }
-        }
-
-        storeCustomKillSound(file) {
-            if (!file || !file.type || !file.type.startsWith('audio/')) return;
-            if (file.size > 8 * 1024 * 1024) {
-                this.notify({ title: 'Sound Pack', message: 'Choose an audio file smaller than 8 MB.' });
-                return;
-            }
-            const reader = new FileReader();
-            reader.onload = () => {
-                try {
-                    localStorage.setItem('betascript_custom_kill_sound', reader.result);
-                    this.settings.customSoundPack = 'custom';
-                    this.saveSettings('betascript_settings', this.settings);
-                    this.notify({ title: 'Sound Pack', message: 'Custom kill sound loaded.' });
-                } catch (e) {
-                    this.notify({ title: 'Sound Pack', message: 'The browser could not store that audio file.' });
-                }
-            };
-            reader.readAsDataURL(file);
-        }
-
-        clearCustomKillSound() {
-            try { localStorage.removeItem('betascript_custom_kill_sound'); } catch (e) {}
-            if (this.settings.customSoundPack === 'custom') this.settings.customSoundPack = 'off';
-            this.saveSettings('betascript_settings', this.settings);
-        }
-
         initializeLoader() {
             console.log("betascript: Initializing Game Loader...");
             if (window.__betaOfficialClientMode) {
@@ -695,10 +552,10 @@
                         const js = await downloadGame(src);
                         if (!js || js.length <= 1000) continue;
                         const verMatch = /(?:let|var)\s+[^\s=,]+\s*,\s*[^\s=,]+\s*,\s*[^\s=,]+\s*,\s*[^\s=,]+\s*=\s*['"]([0-9]+\.[0-9]+\.[0-9]+)['"]/s.exec(js) || /['"]([0-9]+\.[0-9]+\.[0-9]+)['"]\s*,\s*[^\s=,]+\s*=\s*[^\s=,]+\s*\+\s*['"]r1['"]/.exec(js);
-                        if (verMatch && !/^10\./.test(verMatch[1])) { console.warn('betascript: stale client ' + verMatch[1] + ' — skipping ' + src); continue; }
+                        if (verMatch && !/^10\./.test(verMatch[1])) { console.warn('betascript: stale client ' + verMatch[1] + ' ΓÇö skipping ' + src); continue; }
                         const p = this.patchGameScript(js);
-                        if (!p) { console.warn('betascript: mirror source hooks missing — skipping ' + src); continue; }
-                        try { new Function(p); } catch (e) { console.warn('betascript: mirror failed to compile — skipping ' + src); continue; }
+                        if (!p) { console.warn('betascript: mirror source hooks missing ΓÇö skipping ' + src); continue; }
+                        try { new Function(p); } catch (e) { console.warn('betascript: mirror failed to compile ΓÇö skipping ' + src); continue; }
                         gameJS = js;
                         patchedScript = p;
                         break;
@@ -813,7 +670,7 @@
       this.vars.procInputs = procInputsMatch ? procInputsMatch[1] || procInputsMatch[2] : "procInputs";
       const weaponIndexMatch = /this\[['"]ammos['"]\]\[this\[['"]([a-zA-Z0-9_$]+)['"]\]\]/.exec(script) || /this\[['"]ammos['"]\]\[this\.([a-zA-Z0-9_$]+)\]/.exec(script) || /\}\s*else\s*\{\s*this\.[^\s=\[]+\[this\.([^\s=\]]+)\]\s*=\s*[^;]+;\s*\}\s*[^.\s]+\.updatePlayerAmmo\(this\);/s.exec(script);
       this.vars.weaponIndex = weaponIndexMatch ? weaponIndexMatch[1] : "loadoutIndex";
-      console.log("betascript: Fast Variable Hook Extracted:", this.vars);
+      console.log("≡ƒææ betascript: Fast Variable Hook Extracted:", this.vars);
       return script;
     }
         initializeGameHooks() {
@@ -874,7 +731,7 @@
                         if (this.ahNum === 0) {
                             cheatInstance.socket = this; cheatInstance.wsEvent = this._dispatchEvent.bind(this); cheatInstance.wsSend = this.send.bind(this);
                             // Guard: the game can reassign `events` on the same
-                            // socket object between rounds — never stack wrappers.
+                            // socket object between rounds ΓÇö never stack wrappers.
                             if (!this.send[cheatInstance.isProxy]) {
                             const _origSend = this.send;
                             this.send = function (type, ...message) {
@@ -947,9 +804,7 @@
         onRenderFrame() {
             if (!this.three || !this.renderer?.camera || !this.me) return;
             this.applyLocalCosmetics();
-            this.updateCustomSoundPack();
             this.updateFOV();
-            this.updateCameraOffset();
             if (this.settings.chamsEnabled || this._chamsActive) { this.applyChams(); }
             this.update3DESP();
             this.applyRage();
@@ -1001,7 +856,7 @@
                 const centerX = this.overlay.canvas.width / 2; const centerY = this.overlay.canvas.height / 2;
                 this.ctx.beginPath(); this.ctx.arc(centerX, centerY, this.settings.fovSize, 0, 2 * Math.PI, false);
                 this.ctx.lineWidth = 2; this.ctx.strokeStyle = 'rgba(255,255,255,0.7)';
-                this.ctx.stroke();
+                this.ctx.shadowColor = 'rgba(255,255,255,1)'; this.ctx.shadowBlur = 10; this.ctx.stroke(); this.ctx.shadowBlur = 0;
             }
             if (this.game?.players?.list) {
                 for (const player of this.game.players.list) {
@@ -1131,11 +986,11 @@
             const teamingFriendly = this.isTeamingFriendly();
             const rows = users.slice(0, 8).map(u => {
                 const dev = u.role === 'owner', mod = u.role === 'moderator';
-                const suffix = u.teamed ? ' · teamed' : u.pact ? ' · pact' : (teamingFriendly && u.teamMode ? ' · auto' : '');
+                const suffix = u.teamed ? ' ┬╖ teamed' : u.pact ? ' ┬╖ pact' : (teamingFriendly && u.teamMode ? ' ┬╖ auto' : '');
                 const color = dev ? '#d946ef' : mod ? '#00f0ff' : u.teamed ? '#00f0ff' : u.pact ? '#ffaa00' : u.teammate ? '#00ff88' : '#ffffff';
-                return { text: (dev ? '[DEV] ' : mod ? '[MOD] ' : u.teammate ? '[T] ' : '') + u.name + (u.dist != null ? ` ${u.dist}m` : ' · radar') + suffix, color };
+                return { text: (dev ? '[DEV] ' : mod ? '[MOD] ' : u.teammate ? '[T] ' : '') + u.name + (u.dist != null ? ` ${u.dist}m` : ' ┬╖ radar') + suffix, color };
             });
-            const header = `BETASCRIPT USERS · ${users.length}`;
+            const header = `BETASCRIPT USERS ┬╖ ${users.length}`;
             ctx.save();
             ctx.font = '600 12px Rajdhani, Arial, sans-serif';
             ctx.textAlign = 'left';
@@ -1357,7 +1212,6 @@
             if (name && this.betaPact.has(name)) { this.betaPact.delete(name); this.saveBetaPact(); }
             this.notify({ title: 'Team Up', message: (entry && entry.name) || name ? ('Stopped teaming with ' + ((entry && entry.name) || name) + '.') : 'Team entry removed.' });
         }
-
         handleBetaTeamMessage(action, fromSid, fromPid, toPid, fromName) {
             if (!this.settings.scriptNetEnabled) return;
             fromSid = String(fromSid || '').toLowerCase();
@@ -1553,17 +1407,6 @@
             if (s && e) this._tracers.push({ x1: s.x, y1: s.y, x2: e.x, y2: e.y, t: performance.now() });
         }
 
-        checkHitmarker() {
-            if (!this.rayC || !this.renderer || !this.renderer.fpsCamera || !this.game || !this.game.players) return;
-            this.rayC.setFromCamera(this.vec2, this.renderer.fpsCamera);
-            this.playerMaps.length = 0;
-            this.playerMaps = this.game.players.list.map(p => p.objInstances).filter(Boolean);
-            if (this.containsPoint) {
-                const hit = this.rayC.intersectObjects(this.playerMaps, true);
-                if (hit && hit.length) this._hitmarker = performance.now();
-            }
-        }
-
         drawRageVisuals() {
             const now = performance.now();
             const ctx = this.ctx;
@@ -1581,22 +1424,6 @@
                     CRC2d.lineTo.apply(ctx, [t.x2, t.y2]);
                     CRC2d.stroke.apply(ctx, []);
                 }
-                CRC2d.restore.apply(ctx, []);
-            }
-            if (this._hitmarker && now - this._hitmarker < 120) {
-                const cx = this.overlay.canvas.width / 2;
-                const cy = this.overlay.canvas.height / 2;
-                const sz = 8;
-                const a = 1 - (now - this._hitmarker) / 120;
-                ctx.strokeStyle = 'rgba(255,80,80,' + a.toFixed(3) + ')';
-                ctx.lineWidth = 2;
-                CRC2d.save.apply(ctx, []);
-                CRC2d.beginPath.apply(ctx, []);
-                CRC2d.moveTo.apply(ctx, [cx - sz, cy - sz]); CRC2d.lineTo.apply(ctx, [cx - sz + 4, cy - sz + 4]);
-                CRC2d.moveTo.apply(ctx, [cx + sz, cy - sz]); CRC2d.lineTo.apply(ctx, [cx + sz - 4, cy - sz + 4]);
-                CRC2d.moveTo.apply(ctx, [cx - sz, cy + sz]); CRC2d.lineTo.apply(ctx, [cx - sz + 4, cy + sz - 4]);
-                CRC2d.moveTo.apply(ctx, [cx + sz, cy + sz]); CRC2d.lineTo.apply(ctx, [cx + sz - 4, cy + sz - 4]);
-                CRC2d.stroke.apply(ctx, []);
                 CRC2d.restore.apply(ctx, []);
             }
         }
@@ -1797,47 +1624,6 @@
             this._updateChamsMaterials(entity, s, isLocal);
         }
 
-        getCameraRig() {
-            const scene = this.renderer && this.renderer.scene;
-            if (!scene || !scene.children) return null;
-            // Same shape the standalone offset script looks for: the scene
-            // entity whose child chain ends in the player's PerspectiveCamera.
-            // (The camera is not reliably under me.objInstances, e.g. the
-            // first-person rig lives at scene level.)
-            const holdsCam = (node) => node && node.children && node.children[0] && node.children[0].children &&
-                node.children[0].children[0] && node.children[0].children[0].isCamera;
-            if (this._camRig) {
-                const p = this._camRig.parent;
-                if (p && p.parent === scene && holdsCam(p)) return this._camRig;
-                this._camRig = null;
-            }
-            for (const entity of scene.children) {
-                if (entity && entity.type === 'Object3D' && holdsCam(entity)) { this._camRig = entity.children[0]; break; }
-            }
-            return this._camRig;
-        }
-
-        updateCameraOffset() {
-            const ox = Number(this.settings.cameraOffsetX) || 0;
-            const oy = Number(this.settings.cameraOffsetY) || 0;
-            const oz = Number(this.settings.cameraOffsetZ) || 0;
-            const rig = this.getCameraRig();
-            if (!rig || !rig.position) { this._camOffsetActive = false; return; }
-            if (!ox && !oy && !oz) {
-                // Restore neutral once when the feature is parked at zero so a
-                // stale offset can't linger after the user resets the sliders.
-                if (this._camOffsetActive) {
-                    this._camOffsetActive = false;
-                    try { rig.position.x = 0; rig.position.y = 0; rig.position.z = 0; } catch (e) {}
-                }
-                return;
-            }
-            this._camOffsetActive = true;
-            try {
-                rig.position.x = ox; rig.position.y = oy; rig.position.z = oz;
-            } catch (e) {}
-        }
-
         updateFOV() {
             const scene = this.renderer && this.renderer.scene;
             const value = Number(this.settings.fovChanger);
@@ -2012,21 +1798,13 @@
 
             const _shootingNow = !!inputPacket[gameInputIndices.shoot];
             if (_shootingNow && !this._lastShoot) {
-                if (this.settings.bulletTracers || this.settings.alwaysTrail) this.spawnTracer();
-                if (this.settings.hitmarkers) this.checkHitmarker();
+                if (this.settings.alwaysTrail) this.spawnTracer();
             }
             this._lastShoot = _shootingNow;
 
-            // Force-hold jump while Space is down: the game jumps whenever it
-            // is able (e.g. on landing), so holding always works. The old
-            // per-tick XOR could land on an "off" phase exactly at touchdown
-            // and eat the hop.
             if (this.settings.bhopEnabled && this.pressedKeys.has('Space')) {
-                const jumpVal = this.controls.binds?.jump?.val;
-                if (jumpVal !== undefined) {
-                    this.controls.keys[jumpVal] = 1;
-                    this.controls.didPressed[jumpVal] = 1;
-                }
+                this.controls.keys[this.controls.binds.jump.val] ^= 1;
+                if (this.controls.keys[this.controls.binds.jump.val]) { this.controls.didPressed[this.controls.binds.jump.val] = 1; }
                 if (this.me.velocity.y < -0.03 && this.me.canSlide) {
                     setTimeout(() => { this.controls.keys[this.controls.binds.crouch.val] = 0; }, this.me.slideTimer || 325);
                     this.controls.keys[this.controls.binds.crouch.val] = 1; this.controls.didPressed[this.controls.binds.crouch.val] = 1;
@@ -2107,7 +1885,7 @@
                 if (isMelee && distance > (this.me.weapon.canThrow ? throwRange : closeRange)) { }
                 else {
                     const aimPoint = this.getAimPoint(target);
-                    // Slider is -100..100 in hundredths of a world unit (±1 max:
+                    // Slider is -100..100 in hundredths of a world unit (┬▒1 max:
                     // a player is ~11 tall). Raw units would aim into the sky.
                     const targetY = aimPoint.y + (Number(this.settings.aimOffset) || 0) * 0.01;
                     const yDire = this.getDirection(this.me.z, this.me.x, aimPoint.z, aimPoint.x);
@@ -2161,7 +1939,7 @@
 
                     if (this.settings.superSilentEnabled) {
                         // Silent aim points the packet yaw at the target while the
-                        // camera keeps looking elsewhere — but movement resolves
+                        // camera keeps looking elsewhere ΓÇö but movement resolves
                         // against packet yaw, so without compensation you drift
                         // toward the target. Rotate moveDir by the yaw delta
                         // (same convention as the spinbot fix) to keep moving in
@@ -2228,7 +2006,8 @@
                 // anti-aim once truly targetless for a while; otherwise leave
                 // the camera where the aimbot left it.
                 const quietMs = Date.now() - (this._lastAimTargetAt || 0);
-                if ((this.settings.antiAimEnabled || this.settings.antiAimSpinEnabled) && !this.me.didShoot && quietMs > 350) {
+                const offsetOn = ((Number(this.settings.antiAimRotationOffset) || 0) !== 0);
+                if ((this.settings.antiAimEnabled || this.settings.antiAimSpinEnabled || offsetOn) && !this.me.didShoot && quietMs > 350) {
                     this.applyAntiAim(inputPacket, gameInputIndices);
                 }
                 this.updateFOV();
@@ -2252,7 +2031,22 @@
                 inputPacket[idx.ydir] = realYaw * 1000;
                 inputPacket[idx.xdir] = -Math.PI * 500;
             }
-            if (!s.antiAimSpinEnabled) return;
+            // Rotation offset is its own feature: works with spinbot off and
+            // anti-aim off. 0 = disabled. Only yaw is shifted here so pitch
+            // (look-down or real aim) is untouched.
+            const offsetDeg = Number(s.antiAimRotationOffset) || 0;
+            const offsetRad = offsetDeg * Math.PI / 180;
+            if (!s.antiAimSpinEnabled) {
+                if (offsetDeg !== 0) {
+                    const fullTurn = Math.PI * 2;
+                    const rawYaw = realYaw + offsetRad;
+                    const outYaw = ((rawYaw + Math.PI) % fullTurn + fullTurn) % fullTurn - Math.PI;
+                    inputPacket[idx.ydir] = Math.round(outYaw * 1000);
+                    // Movement is left exactly as the game built it: moveDir
+                    // stays camera-relative so walking/sliding is unaffected.
+                }
+                return;
+            }
 
             const inAir = !me.onGround;
             // Spin while moving on ground or in air, pausing briefly before
@@ -2278,13 +2072,11 @@
                 this.antiAimAngle += (s.antiAimSpinSpeed * 0.001) * Math.PI * 2;
                 if (this.antiAimAngle > Math.PI * 2) { this.antiAimAngle %= Math.PI * 2; this._spinRevs = (this._spinRevs || 0) + 1; }
                 const stepAngle = Math.PI / 4;
-                const spinSteps = ((Math.round(this.antiAimAngle / stepAngle) % 8) + 8) % 8;
-                // Use the packet yaw as the base: prediction and aim hooks can
-                // make it differ from the visible camera yaw.
-                const packetYaw = Number(inputPacket[idx.ydir]) / 1000;
-                const baseYaw = Number.isFinite(packetYaw) ? packetYaw : (Number.isFinite(realYaw) ? realYaw : 0);
                 const fullTurn = Math.PI * 2;
-                const rawSpinYaw = baseYaw + spinSteps * stepAngle;
+                // Static offset in degrees: 180 = model backwards, camera + movement unaffected.
+                // Smooth continuous yaw: camera yaw + accumulated spin + static offset.
+                // Never touches controls.object.rotation, so camera stays normal.
+                const rawSpinYaw = realYaw + this.antiAimAngle + offsetRad;
                 const spinYaw = ((rawSpinYaw + Math.PI) % fullTurn + fullTurn) % fullTurn - Math.PI;
                 // Keep outgoing yaw bounded and encoded like native input.
                 inputPacket[idx.ydir] = Math.round(spinYaw * 1000);
@@ -2298,10 +2090,23 @@
                 const moveIndex = inputPacket[idx.moveDir];
                 if (Number.isInteger(moveIndex) && moveIndex >= 0 && moveIndex < 8) {
                     // World move direction is movDirAngle - packetYaw, so the
-                    // move index must rotate WITH the spun yaw to hold still.
-                    inputPacket[idx.moveDir] = ((moveIndex + spinSteps) % 8 + 8) % 8;
+                    // move index must rotate WITH the spun yaw to hold camera-relative movement.
+                    // Continuous yaw -> quantize only the move compensation (moveDir is 0-7 discrete).
+                    // NB: spin angle only ΓÇö the static rotation offset never touches
+                    // moveDir, so walking/sliding packets stay normal.
+                    const deltaSteps = Math.round(this.antiAimAngle / stepAngle);
+                    inputPacket[idx.moveDir] = ((moveIndex + deltaSteps) % 8 + 8) % 8;
                 }
             } else {
+                // Landing pause: hold camera yaw but keep static offset so
+                // 180 offset stays backwards instead of snapping forward.
+                if (offsetDeg !== 0) {
+                    const fullTurn = Math.PI * 2;
+                    const rawSpinYaw = realYaw + this.antiAimAngle + offsetRad;
+                    const spinYaw = ((rawSpinYaw + Math.PI) % fullTurn + fullTurn) % fullTurn - Math.PI;
+                    inputPacket[idx.ydir] = Math.round(spinYaw * 1000);
+                    // No moveDir touch here either ΓÇö movement stays normal.
+                }
                 // On the ground (or while the override is held), preserve the
                 // packet's own yaw. Replacing it with camera yaw at touchdown
                 // can introduce a one-tick movement heading snap.
@@ -2904,7 +2709,7 @@
         }
 
         panic() {
-            ['aimbotEnabled', 'autoFireEnabled', 'triggerbotEnabled', 'superSilentEnabled', 'legitAimbot', 'chamsEnabled', 'espLines', 'espNameTags', 'espWeapon', 'espWeaponIcon', 'espLevel', 'espDistance', 'skeletonESP', 'selfESP', 'selfSkeletonESP', 'drawFovCircle', 'wireframeEnabled', 'bulletTracers', 'hitmarkers'].forEach(k => { this.settings[k] = false; });
+            ['aimbotEnabled', 'autoFireEnabled', 'triggerbotEnabled', 'superSilentEnabled', 'legitAimbot', 'chamsEnabled', 'espLines', 'espNameTags', 'espWeapon', 'espWeaponIcon', 'espLevel', 'espDistance', 'skeletonESP', 'selfESP', 'selfSkeletonESP', 'drawFovCircle', 'wireframeEnabled'].forEach(k => { this.settings[k] = false; });
             this.saveSettings('betascript_settings', this.settings);
             const c = document.querySelector('.betascript-menu-container');
             if (c) c.style.display = 'none';
@@ -2986,10 +2791,10 @@
 .betascript-menu-item-icon{width:19px!important;height:19px!important;fill:none!important;stroke:rgba(255,255,255,0.55)!important;stroke-width:1.8!important;stroke-linecap:round!important;stroke-linejoin:round!important;flex-shrink:0!important;}
 .betascript-menu-item.active .betascript-menu-item-icon{stroke:#fff!important;}
 .betascript-menu-item-content label{cursor:pointer!important;font-size:15px!important;font-weight:600!important;letter-spacing:.4px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;font-family:'Rajdhani',sans-serif!important;}
-.betascript-menu-item[data-tip]:hover::after{content:attr(data-tip)!important;position:absolute!important;bottom:calc(100% + 8px)!important;left:50%!important;transform:translateX(-50%)!important;background:#1a1a1a!important;color:#c9c9c9!important;padding:8px 12px!important;border-radius:8px!important;font-size:12px!important;max-width:280px!important;z-index:100!important;border:1px solid rgba(255,255,255,0.4)!important;pointer-events:none!important;line-height:1.4!important;font-weight:500!important;white-space:normal!important;}
-.betascript-controls{display:flex!important;align-items:center!important;gap:10px!important;flex-shrink:0!important;}
 .betascript-menu-labelcol{display:flex!important;flex-direction:column!important;min-width:0!important;justify-content:center!important;}
 .betascript-menu-sub{font-size:10.5px!important;color:rgba(255,255,255,.45)!important;line-height:1.35!important;white-space:normal!important;font-family:'Rajdhani',sans-serif!important;}
+.betascript-menu-item[data-tip]:hover::after{content:attr(data-tip)!important;position:absolute!important;bottom:calc(100% + 8px)!important;left:50%!important;transform:translateX(-50%)!important;background:#1a1a1a!important;color:#c9c9c9!important;padding:8px 12px!important;border-radius:8px!important;font-size:12px!important;max-width:280px!important;z-index:100!important;border:1px solid rgba(255,255,255,0.4)!important;pointer-events:none!important;line-height:1.4!important;font-weight:500!important;white-space:normal!important;}
+.betascript-controls{display:flex!important;align-items:center!important;gap:10px!important;flex-shrink:0!important;}
 .betascript-toggle-switch{width:46px!important;height:24px!important;background:rgba(255,255,255,0.09)!important;border:1px solid rgba(255,255,255,0.06)!important;border-radius:20px!important;position:relative!important;cursor:pointer!important;transition:all .2s!important;flex-shrink:0!important;}
 .betascript-toggle-switch::after{content:''!important;position:absolute!important;top:2px!important;left:2px!important;width:18px!important;height:18px!important;background:#8a8a8a!important;border-radius:50%!important;transition:left .2s,background .2s!important;}
 .betascript-toggle-switch.active{background:#ffffff!important;border-color:#ffffff!important;}
@@ -3073,7 +2878,7 @@
                   <div class="betascript-hotkey-content">
                       <h2>Press a Key or Mouse Button</h2>
                       <p>Assign hotkey to <span id="betascript-hotkeyFeatureName">...</span></p>
-                      <p>ESC to cancel · DEL to unbind</p>
+                      <p>ESC to cancel ┬╖ DEL to unbind</p>
                   </div>
               </div>`;
         const modalContainer = document.createElement('div');
@@ -3141,12 +2946,12 @@
                 aimbotWallCheck:'No target through walls.', aimbotWallBangs:'Shoot through penetrable walls.',
                 aimbotTeamCheck:'No target teammates.', aimbotBotCheck:'Target AI/bots.',
                 autoFireEnabled:'Auto fires for the aimbot target.', triggerbotEnabled:'Legit triggerbot: fires when an enemy crosses your crosshair, even with aimbot disabled.', superSilentEnabled:'Aims without moving camera.',
-                fovSize:'FOV radius. 0 = full screen.', drawFovCircle:'Displays FOV circle.', aimBone:'Selects the model joint the aimbot aims at.', aimOffset:'Fine vertical aim adjust, ±1 world unit.',
+                fovSize:'FOV radius. 0 = full screen.', drawFovCircle:'Displays FOV circle.', aimBone:'Selects the model joint the aimbot aims at.', aimOffset:'Fine vertical aim adjust, ┬▒1 world unit.',
                 espTeamCheck:'No ESP for teammates.', espBotCheck:'ESP for AI/bots.',
                 espLines:'Line from bottom to enemies.', espSquare:'Flat screen-space box around enemies.', esp3DBoxes:'3D box around player models.',
                  espNameTags:'Shows player names.', espColor:'ESP line color.',
                  espWeapon:'Shows the equipped weapon name below players.', espWeaponIcon:'Shows the equipped weapon icon.', espLevel:'Shows player level independently above the box.', espDistance:'Shows distance below players.', espScale:'Scales ESP text, lines and bars.', skeletonESP:'Draws player joints using live model bones when available.', selfESP:'Shows the normal overlay on your own player.', selfSkeletonESP:'Shows the animated skeleton on your own player independently.', selfESPView:'Choose which camera view displays self ESP.',
-noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:'Massively increases fire rate.', infiniteAmmo:'Keeps your ammo at 9999.', instantReload:'Skips the reload timer.', godMode:'Prevents all incoming damage.', fly:'Lets you fly by looking and moving (noclip).', speedHack:'Multiplies your movement speed.', speedHackValue:'Movement speed multiplier.', recon:'Grants the recon/ghost vision perk.', bulletTracers:'Draws tracers when you shoot.', hitmarkers:'Shows a hitmarker when you damage a player.',
+noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:'Massively increases fire rate.', infiniteAmmo:'Keeps your ammo at 9999.', instantReload:'Skips the reload timer.', godMode:'Prevents all incoming damage.', fly:'Lets you fly by looking and moving (noclip).', speedHack:'Multiplies your movement speed.', speedHackValue:'Movement speed multiplier.', recon:'Grants the recon/ghost vision perk.',
                 boxColor:'Box & info color.', botColor:'Bot ESP color.',
                 wireframeEnabled:'Wireframe rendering.', unlockSkins:'Client-side skin unlocker.',
                 bhopEnabled:'Hold space auto-jump.', antiAimEnabled:'Anti-aim pose: makes your character look down while preserving camera yaw.',
@@ -3155,14 +2960,10 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
                 announceBetaUsers:'Shows a notification when another betascript user is detected.',
                 allowTeamRequests:'Let other betascript users send you team-up requests.',
                 captureSafeOverlay:'Hides custom ESP/overlay drawing for screen sharing or recording. Toggle manually before capture.',
-                customSoundPack:'Plays a local replacement sound when your kill count increases. Built-in packs use Web Audio; custom sounds stay in local browser storage.',
                 autoNuke:'Auto nuke when available.', antikick:'Prevents inactivity kick.',
                 autoReload:'Auto reload when empty.',
                 thirdPersonEnabled: 'Play in 3rd person view.',
                 alwaysTrail: 'Always show bullet trails.',
-                cameraOffsetX: 'Camera left/right offset for shoulder-cam views.',
-                cameraOffsetY: 'Camera up/down offset for shoulder-cam views.',
-                cameraOffsetZ: 'Camera forward/back offset for shoulder-cam views.',
                 weaponZoom: 'Adjust ADS zoom level (1 = default).',
                 fovChanger: 'Locks the same camera FOV across hip-fire, ADS, and every weapon. 0 = off.',
                 chamsEnabled: 'Highlights player models with separate normal and visible colors.',
@@ -3177,6 +2978,7 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
                 weaponChamsColor: 'Weapon chams color.',
                 weaponChamsOpacity: 'Weapon chams opacity.',
                 antiAimSpinSpeed: 'Anti-aim spin speed (desync rotation).',
+                antiAimRotationOffset: 'Static model offset in degrees. 180 = model faces backwards while camera and movement stay normal.',
                 antiAimJitter: 'Adds subtle random wobble to anti-aim.',
                 antiAimSpinEnabled: 'Spinbot: spins while walking and airborne, pausing briefly around landings.',
                 airAntiAimEnabled: 'Aero anti-aim: spins in the air, applies look-down anti-aim on the ground.',
@@ -3202,7 +3004,7 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
         </div>
     </div>
     <div class="betascript-menu-body">
-        <div class="betascript-menu-toolbar"><input id="betascript-menu-search" class="betascript-menu-search" type="search" placeholder="Search settings…" autocomplete="off" aria-label="Search settings"></div>
+        <div class="betascript-menu-toolbar"><input id="betascript-menu-search" class="betascript-menu-search" type="search" placeholder="Search settingsΓÇª" autocomplete="off" aria-label="Search settings"></div>
         <div class="betascript-tab-pane active" id="betascript-tab-aimbot">
             <div class="betascript-section">Presets</div>
             <div class="betascript-preset-row">
@@ -3243,9 +3045,6 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
             ${this.createMenuItemHTML('toggle','captureSafeOverlay','Capture-Safe Overlay', I.settings, tips.captureSafeOverlay)}
             ${this.createMenuItemHTML('slider','fovChanger','FOV Changer (0=off)', I.fov, tips.fovChanger, 0, 160, 1)}
             ${this.createMenuItemHTML('slider','weaponZoom','Weapon Zoom', I.fov, 'Adjust ADS zoom level (1 = default).', 0.1, 5, 0.1)}
-            ${this.createMenuItemHTML('slider','cameraOffsetX','Camera X (Left/Right)', I.fov, tips.cameraOffsetX, -30, 30, 0.5)}
-            ${this.createMenuItemHTML('slider','cameraOffsetY','Camera Y (Up/Down)', I.fov, tips.cameraOffsetY, -30, 30, 0.5)}
-            ${this.createMenuItemHTML('slider','cameraOffsetZ','Camera Z (Forward/Back)', I.fov, tips.cameraOffsetZ, -30, 30, 0.5)}
             <div class="betascript-section">Boxes & Overlay</div>
             ${this.createMenuItemHTML('slider','espScale','ESP Scale', I.espSquare, tips.espScale, 0.5, 2.5, 0.05)}
             ${this.createSelectMenuItemHTML('espBoxMode','Box Style', I.espSquare, 'Choose one box style: Off, 2D, or 3D.', [['off','Off'],['2d','2D'],['3d','3D']], 'espBoxColor', 'espBoxVisibleColor')}
@@ -3281,7 +3080,8 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
             <div class="betascript-section">Anti-Aim</div>
             ${this.createMenuItemHTML('toggle','antiAimEnabled','Anti-Aim (Look Down)', I.antiAim, tips.antiAimEnabled)}
             ${this.createMenuItemHTML('toggle','antiAimSpinEnabled','Spinbot', I.antiAim, tips.antiAimSpinEnabled)}
-            ${this.createMenuItemHTML('slider','antiAimSpinSpeed','Spinbot Speed', I.antiAim, tips.antiAimSpinSpeed, 50, 500, 5)}
+            ${this.createMenuItemHTML('slider','antiAimSpinSpeed','Spinbot Speed', I.antiAim, tips.antiAimSpinSpeed, 5, 500, 5)}
+            ${this.createMenuItemHTML('slider','antiAimRotationOffset','Rotation Offset (deg)', I.antiAim, tips.antiAimRotationOffset, 0, 360, 1)}
             <div class="betascript-section">Automation</div>
             ${this.createMenuItemHTML('toggle','autoNuke','Auto Nuke', I.rocket, tips.autoNuke)}
             ${this.createMenuItemHTML('toggle','antikick','Anti Kick', I.antiKick, tips.antikick)}
@@ -3326,11 +3126,6 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
         <div class="betascript-tab-pane" id="betascript-tab-beta">
             <div class="betascript-section">Weapon</div>
             ${this.createMenuItemHTML('toggle','noRecoil','No Recoil', I.recoil, tips.noRecoil)}
-            <div class="betascript-section">Visual</div>
-            ${this.createMenuItemHTML('toggle','bulletTracers','Bullet Tracers', I.line, tips.bulletTracers)}
-            ${this.createMenuItemHTML('toggle','hitmarkers','Hitmarkers', I.aimbot, tips.hitmarkers)}
-            <div class="betascript-section">Audio</div>
-            ${this.createSoundPackMenuHTML(I.sound, tips.customSoundPack)}
         </div>
     </div>
 </div>
@@ -3352,38 +3147,8 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
 `;
         }
 
-        betaTeamMenuHTML(I) {
-            let users = [];
-            try { users = this.getBetaUserList(); } catch (e) {}
-            if (!users.length) {
-                return `<div class="betascript-menu-item"><div class="betascript-menu-item-content"><svg class="betascript-menu-item-icon" viewBox="0 0 24 24">${I.robot}</svg><label>No betascript users detected</label></div><div class="betascript-controls"></div></div>`;
-            }
-            return users.slice(0, 8).map(u => {
-                const pid = String(u.pid || '').replace(/"/g, '');
-                const nm = String(u.name || '').replace(/"/g, '');
-                const dev = u.role === 'owner', mod = u.role === 'moderator';
-                const label = (dev ? '[DEV] ' : mod ? '[MOD] ' : u.teammate ? '[T] ' : '') + u.name + (u.dist != null ? ` · ${u.dist}m` : ' · radar');
-                const safeLabel = label.replace(/</g, '&lt;');
-                const attrs = `data-betascript-team-pid="${pid}" data-betascript-team-name="${nm.replace(/</g, '&lt;')}"`;
-                let action = '';
-                if ((pid && this.betaTeam.has(pid)) || this.betaPact.has(u.name)) {
-                    action = `<button type="button" class="betascript-hk-btn" data-betascript-team-act="leave" ${attrs}>Leave</button>`;
-                } else if (pid && this.betaTeamOut.has(pid)) {
-                    action = `<button type="button" class="betascript-hk-btn" disabled>Requested…</button>`;
-                } else if (pid && this.betaTeamIn.has(pid)) {
-                    action = `<button type="button" class="betascript-hk-btn bound" data-betascript-team-act="accept" ${attrs}>Accept</button>`;
-                } else if (pid) {
-                    action = `<button type="button" class="betascript-hk-btn" data-betascript-team-act="req" ${attrs}>Team</button>`;
-                } else {
-                    action = `<button type="button" class="betascript-hk-btn" data-betascript-team-act="pact" ${attrs}>Team</button>`;
-                }
-                return `<div class="betascript-menu-item"><div class="betascript-menu-item-content"><svg class="betascript-menu-item-icon" viewBox="0 0 24 24">${I.robot}</svg><label>${safeLabel}</label></div><div class="betascript-controls">${action}</div></div>`;
-            }).join('');
-        }
-
         menuLabelHTML(label, tooltip) {
-            const safeTip = String(tooltip || '').replace(/&/g, '&amp;').replace(/</g, '&lt;');
-            return `<div class="betascript-menu-labelcol"><label>${label}</label>` + (safeTip ? `<span class="betascript-menu-sub">${safeTip}</span>` : '') + `</div>`;
+            return `<div class="betascript-menu-labelcol"><label>${label}</label></div>`;
         }
 
         createMenuItemHTML(type, setting, label, iconPath, tooltip = '', min, max, step) {
@@ -3466,27 +3231,33 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
             </div>`;
         }
 
-        createSoundPackMenuHTML(iconPath, tooltip) {
-            const iconSVG = `<svg class="betascript-menu-item-icon" viewBox="0 0 24 24">${iconPath}</svg>`;
-            const tipAttr = tooltip ? ` data-tip="${tooltip}"` : '';
-            const selected = this.settings.customSoundPack || 'off';
-            return `<div class="betascript-menu-item" data-setting="customSoundPack"${tipAttr}>
-                <div class="betascript-menu-item-content">${iconSVG}${this.menuLabelHTML('Kill Sound Pack', tooltip)}</div>
-                <div class="betascript-controls" style="gap:5px;flex-wrap:wrap;justify-content:flex-end">
-                    <select class="betascript-select" data-setting="customSoundPack">
-                        <option value="off" ${selected === 'off' ? 'selected' : ''}>Off</option>
-                        <option value="satisfying" ${selected === 'satisfying' ? 'selected' : ''}>Satisfying</option>
-                        <option value="arcade" ${selected === 'arcade' ? 'selected' : ''}>Arcade</option>
-                        <option value="custom" ${selected === 'custom' ? 'selected' : ''}>Custom File</option>
-                        <option value="online" ${selected === 'online' ? 'selected' : ''}>Online JSON</option>
-                    </select>
-                    <input type="file" accept="audio/*" data-betascript-kill-sound-file style="max-width:145px;font-size:10px">
-                    <input type="url" data-betascript-sound-pack-url placeholder="HTTPS pack JSON URL" value="${String(this.settings.onlineSoundPackUrl || '').replace(/"/g, '&quot;')}" style="max-width:165px;font-size:10px">
-                    <button type="button" data-betascript-load-sound-pack class="betascript-hk-btn">Load Online</button>
-                    <button type="button" data-betascript-test-sound class="betascript-hk-btn">Test Kill</button>
-                    <button type="button" data-betascript-clear-sound class="betascript-hk-btn">Clear</button>
-                </div>
-            </div>`;
+        betaTeamMenuHTML(I) {
+            let users = [];
+            try { users = this.getBetaUserList(); } catch (e) {}
+            if (!users.length) {
+                return `<div class="betascript-menu-item"><div class="betascript-menu-item-content"><svg class="betascript-menu-item-icon" viewBox="0 0 24 24">${I.robot}</svg><label>No betascript users detected</label></div><div class="betascript-controls"></div></div>`;
+            }
+            return users.slice(0, 8).map(u => {
+                const pid = String(u.pid || '').replace(/"/g, '');
+                const nm = String(u.name || '').replace(/"/g, '');
+                const dev = u.role === 'owner', mod = u.role === 'moderator';
+                const label = (dev ? '[DEV] ' : mod ? '[MOD] ' : u.teammate ? '[T] ' : '') + u.name + (u.dist != null ? ` ┬╖ ${u.dist}m` : ' ┬╖ radar');
+                const safeLabel = label.replace(/</g, '&lt;');
+                const attrs = `data-betascript-team-pid="${pid}" data-betascript-team-name="${nm.replace(/</g, '&lt;')}"`;
+                let action = '';
+                if ((pid && this.betaTeam.has(pid)) || this.betaPact.has(u.name)) {
+                    action = `<button type="button" class="betascript-hk-btn" data-betascript-team-act="leave" ${attrs}>Leave</button>`;
+                } else if (pid && this.betaTeamOut.has(pid)) {
+                    action = `<button type="button" class="betascript-hk-btn" disabled>RequestedΓÇª</button>`;
+                } else if (pid && this.betaTeamIn.has(pid)) {
+                    action = `<button type="button" class="betascript-hk-btn bound" data-betascript-team-act="accept" ${attrs}>Accept</button>`;
+                } else if (pid) {
+                    action = `<button type="button" class="betascript-hk-btn" data-betascript-team-act="req" ${attrs}>Team</button>`;
+                } else {
+                    action = `<button type="button" class="betascript-hk-btn" data-betascript-team-act="pact" ${attrs}>Team</button>`;
+                }
+                return `<div class="betascript-menu-item"><div class="betascript-menu-item-content"><svg class="betascript-menu-item-icon" viewBox="0 0 24 24">${I.robot}</svg><label>${safeLabel}</label></div><div class="betascript-controls">${action}</div></div>`;
+            }).join('');
         }
 
         bindMenuEvents() {
@@ -3529,7 +3300,7 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
                 const nm = btn.dataset.betaTeamName || '';
                 if (act === 'req') {
                     this.sendBetaTeamRequest(pid);
-                    btn.textContent = 'Requested…';
+                    btn.textContent = 'RequestedΓÇª';
                     btn.setAttribute('disabled', '');
                 } else if (act === 'pact') {
                     if (this.toggleBetaPact(nm)) { btn.textContent = 'Leave'; btn.dataset.betaTeamAct = 'leave'; }
@@ -3679,17 +3450,6 @@ noRecoil:'Removes weapon recoil.', noSpread:'Removes weapon spread.', rapidFire:
                     e.target.value = '';
                 });
             }
-            const soundFile = menu.querySelector('[data-betascript-kill-sound-file]');
-            if (soundFile) soundFile.addEventListener('change', e => this.storeCustomKillSound(e.target.files && e.target.files[0]));
-            const soundPackUrl = menu.querySelector('[data-betascript-sound-pack-url]');
-            if (soundPackUrl) soundPackUrl.addEventListener('change', e => { this.settings.onlineSoundPackUrl = e.target.value.trim(); this.saveSettings('betascript_settings', this.settings); });
-            const loadSoundPack = menu.querySelector('[data-betascript-load-sound-pack]');
-            if (loadSoundPack) loadSoundPack.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); this.loadOnlineSoundPack(); });
-            const testSound = menu.querySelector('[data-betascript-test-sound]');
-            if (testSound) testSound.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); this.playSoundEvent('kill', true); });
-            const clearSound = menu.querySelector('[data-betascript-clear-sound]');
-            if (clearSound) clearSound.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); this.clearCustomKillSound(); try { localStorage.removeItem('betascript_online_sound_pack'); } catch (error) {} });
-
             menu.querySelectorAll('.betascript-slider').forEach(slider => {
                 const setting = slider.dataset.setting;
                 const valueInput = menu.querySelector(`.betascript-slider-value[data-setting="${setting}"]`);
