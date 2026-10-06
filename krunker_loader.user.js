@@ -19,15 +19,17 @@
   'use strict';
   var Q = /quirify/i;
   // Broader auth-request detector: match license/auth-like URLs or bodies, but NEVER
-  // intercept game code / third-party assets (the cheat loads game_3_0.js from its own
-  // GitHub repo "Quirify1", which would otherwise be wrongly faked and crash the cheat).
+  // intercept game code / third-party assets (the cheat loads game.js from GitHub/Vercel,
+  // which would otherwise be wrongly faked and crash the cheat).
   function isAuth(u, body) {
     u = u || '';
-    if (/githubusercontent|github\.com|Krunker-Server-data|game_3_0|cookiepro|cookie|google\.com|krunker\.io|analytics/i.test(u)) return false;
+    if (/githubusercontent|github\.com|Krunker-Server-data|game\.js|game_3_0|cookiepro|cookie|google\.com|krunker\.io|analytics/i.test(u)) return false;
+    if (/matchmaker\.krunker\.io|challenges\.cloudflare\.com|altcha|captcha|turnstile/i.test(u)) return false;
     if (/quirify\.dev/i.test(u)) return true;            // the real license API host
     if (/twitchfollows\.de/i.test(u)) return true;       // cheat's auth/feature server
     if (Q.test(u)) return true;                          // any other quirify* host
     var hay = u + ' ' + (body || '');
+    if (/matchmaker\.krunker\.io|challenges\.cloudflare\.com|altcha|captcha|turnstile|generate-token|validationtoken/i.test(hay)) return false;
     return /licen[sc]e|validate|valid|token|auth|activate|hwid|session|\bkey\b|register|unlock/i.test(hay);
   }
 
